@@ -10,7 +10,11 @@ def evaluate_variance_forecasts(
     forecasts: pd.Series,
     targets: pd.Series,
 ) -> dict[str, float | int]:
-    """Calculate QLIKE and MSE on valid, aligned variance observations."""
+    """Calculate normalized QLIKE and MSE on aligned variance observations.
+
+    Normalized QLIKE is target / forecast - log(target / forecast) - 1.
+    Targets must be strictly positive for this logarithmic form.
+    """
     if not forecasts.index.equals(targets.index):
         raise ValueError("Forecasts and targets must have identical indexes.")
 
@@ -30,13 +34,11 @@ def evaluate_variance_forecasts(
     if (forecast_values <= 0).any():
         raise ValueError("Variance forecasts must be strictly positive.")
 
-    if (target_values < 0).any():
-        raise ValueError("Variance targets cannot be negative.")
+    if (target_values <= 0).any():
+        raise ValueError("Variance targets must be strictly positive for QLIKE.")
 
-    qlike_values = (
-        np.log(forecast_values)
-        + target_values / forecast_values
-    )
+    ratio = target_values / forecast_values
+    qlike_values = ratio - np.log(ratio) - 1
     mse_values = (forecast_values - target_values) ** 2
 
     return {
