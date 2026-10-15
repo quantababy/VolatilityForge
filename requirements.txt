@@ -1,0 +1,26 @@
+﻿# Core numerical and statistical computing
+numpy
+pandas
+scipy
+statsmodels
+scikit-learn
+
+# Market data and volatility models
+yfinance
+pyarrow
+arch
+
+# Machine learning
+lightgbm
+xgboost
+shap
+
+# Visualization and dashboard
+matplotlib
+plotly
+streamlit
+
+# Configuration and testing
+PyYAML
+pytest
+ruff

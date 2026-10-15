@@ -1,0 +1,33 @@
+﻿project:
+  name: VolatilityForge
+  random_seed: 42
+
+data:
+  primary_asset: SPY
+  implied_volatility_asset: "^VIX"
+  start_date: "2000-01-01"
+  cache_format: parquet
+
+forecast:
+  horizons: [1, 5]
+  trading_days_per_year: 252
+
+evaluation:
+  method: expanding_window
+  final_test_start: "2022-01-01"
+  primary_metric: qlike
+  secondary_metrics:
+    - mse
+
+models:
+  ewma:
+    lambda: 0.94
+  har_rv:
+    daily_window: 1
+    weekly_window: 5
+    monthly_window: 22
+
+strategy:
+  target_annual_volatility: 0.10
+  max_leverage: 1.0
+  transaction_cost_bps: 5
