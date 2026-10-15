@@ -1,4 +1,5 @@
-﻿"""Chronological out-of-sample volatility forecasting."""
+﻿
+"""Chronological out-of-sample volatility forecasting."""
 
 from __future__ import annotations
 
@@ -12,11 +13,15 @@ def generate_ewma_forecasts(
     decay: float = 0.94,
     minimum_training_observations: int = 252,
 ) -> pd.DataFrame:
-    """Generate one- and five-day EWMA forecasts without lookahead.
+    """Generate one- and five-day EWMA variance forecasts.
 
-    Initialize variance from the first minimum_training_observations
+    Initialize variance using the first minimum_training_observations
     pre-test returns. Process subsequent returns chronologically.
-    Each forecast at date t uses returns observed strictly before t.
+
+    The forecast recorded at date t uses returns observed through t.
+    The one-day target at t represents the squared return on the next
+    trading day. The five-day target represents the next five squared
+    returns.
     """
     required = {"log_return", "target_rv_1", "target_rv_5"}
     missing = required - set(features.columns)
@@ -57,9 +62,10 @@ def generate_ewma_forecasts(
     if not np.isfinite(variance) or variance <= 0:
         raise ValueError("Initial variance must be finite and positive.")
 
-    # Start after the final return used for initialization.
+    # Continue after the final return used for initialization.
     initialization_date = initial_sample.index[-1]
     start_position = data.index.get_loc(initialization_date) + 1
+
     forecasts = pd.Series(
         index=data.index[data.index >= test_start_date],
         dtype=float,
@@ -67,19 +73,22 @@ def generate_ewma_forecasts(
     )
 
     for date in data.index[start_position:]:
-        # The current return is not observed until after this forecast.
-        if date >= test_start_date:
-            forecasts.loc[date] = variance
-
+        # At the close of date t, its return is observable.
         observed_return = data.at[date, "log_return"]
+
         if pd.notna(observed_return):
             observed_return = float(observed_return)
             if not np.isfinite(observed_return):
                 raise ValueError("Returns must be finite.")
+
             variance = (
                 decay * variance
                 + (1 - decay) * observed_return**2
             )
+
+        # Forecast using information available through date t.
+        if date >= test_start_date:
+            forecasts.loc[date] = variance
 
     result = pd.DataFrame(index=forecasts.index)
     result["ewma_variance_1d"] = forecasts

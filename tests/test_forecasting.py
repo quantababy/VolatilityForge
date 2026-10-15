@@ -36,9 +36,10 @@ def test_forecasts_begin_at_test_start_and_have_both_horizons():
     )
 
 
-def test_changing_test_period_returns_does_not_change_first_forecast():
+def test_future_returns_do_not_change_earlier_forecasts():
     features = make_features()
     test_start = pd.Timestamp("2020-12-01")
+
     original = generate_ewma_forecasts(
         features,
         test_start=str(test_start.date()),
@@ -46,15 +47,16 @@ def test_changing_test_period_returns_does_not_change_first_forecast():
     )
 
     changed = features.copy()
-    changed.loc[changed.index >= test_start, "log_return"] = 0.5
+    changed.loc[changed.index > test_start, "log_return"] = 0.5
+
     modified = generate_ewma_forecasts(
         changed,
         test_start=str(test_start.date()),
         minimum_training_observations=100,
     )
 
-    assert original.iloc[0]["ewma_variance_1d"] == pytest.approx(
-        modified.iloc[0]["ewma_variance_1d"]
+    assert original.loc[test_start, "ewma_variance_1d"] == pytest.approx(
+        modified.loc[test_start, "ewma_variance_1d"]
     )
 
 
@@ -91,11 +93,8 @@ def test_initialization_uses_only_initial_training_window():
     )
 
     variance = np.mean(features["log_return"].iloc[:2] ** 2)
-    for observed_return in features["log_return"].iloc[2:6]:
-        variance = (
-            0.5 * variance
-            + 0.5 * observed_return**2
-        )
+    for observed_return in features["log_return"].iloc[2:7]:
+        variance = 0.5 * variance + 0.5 * observed_return**2
 
     assert result.loc[test_start, "ewma_variance_1d"] == pytest.approx(
         variance
