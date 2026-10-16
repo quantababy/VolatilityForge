@@ -1,0 +1,158 @@
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.models.lightgbm_model import lightgbm_variance_forecasts
+
+
+def make_features(n: int = 180) -> pd.DataFrame:
+    rng = np.random.default_rng(42)
+    index = pd.bdate_range("2020-01-01", periods=n)
+
+    returns = rng.normal(0, 0.01, n)
+    squared_returns = returns**2
+
+    features = pd.DataFrame(index=index)
+    features["log_return"] = returns
+    features["squared_return"] = squared_returns
+    features["rv_5"] = (
+        pd.Series(squared_returns, index=index)
+        .rolling(5, min_periods=5)
+        .sum()
+    )
+    features["rv_22"] = (
+        pd.Series(squared_returns, index=index)
+        .rolling(22, min_periods=22)
+        .sum()
+    )
+    features["VIX_Close"] = 15 + rng.uniform(0, 15, n)
+    features["target_rv_1"] = pd.Series(
+        squared_returns, index=index
+    ).shift(-1)
+
+    return features
+
+
+def test_forecasts_preserve_index_and_name() -> None:
+    features = make_features()
+    forecasts = lightgbm_variance_forecasts(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    pd.testing.assert_index_equal(
+        forecasts.index, features.index.rename("Date")
+    )
+    assert forecasts.name == "lightgbm_variance_1d"
+
+
+def test_available_forecasts_are_positive_and_finite() -> None:
+    forecasts = lightgbm_variance_forecasts(
+        make_features(),
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+    available = forecasts.dropna()
+
+    assert len(available) > 0
+    assert np.isfinite(available).all()
+    assert (available > 0).all()
+
+
+def test_forecasts_require_prior_training_history() -> None:
+    features = make_features()
+    forecasts = lightgbm_variance_forecasts(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    # The first 22 rows lack a complete monthly RV feature.
+    # Forty valid prior labels are then required before forecasting.
+    first_forecast = forecasts.first_valid_index()
+    assert first_forecast is not None
+
+    first_position = features.index.get_loc(first_forecast)
+    assert first_position >= 61
+    assert forecasts.iloc[:first_position].isna().all()
+
+
+def test_future_target_changes_do_not_change_earlier_forecasts() -> None:
+    features = make_features()
+    changed = features.copy()
+
+    # Alter labels only; leave predictors unchanged.
+    changed.iloc[100:, changed.columns.get_loc("target_rv_1")] *= 10
+
+    kwargs = {
+        "minimum_training_observations": 40,
+        "reestimate_every": 10,
+    }
+    original_forecasts = lightgbm_variance_forecasts(features, **kwargs)
+    changed_forecasts = lightgbm_variance_forecasts(changed, **kwargs)
+
+    # The label at position 100 cannot influence the forecast at position 100.
+    pd.testing.assert_series_equal(
+        original_forecasts.iloc[:101],
+        changed_forecasts.iloc[:101],
+    )
+
+
+def test_rejects_missing_columns() -> None:
+    features = make_features().drop(columns=["VIX_Close"])
+
+    with pytest.raises(ValueError, match="Missing required columns"):
+        lightgbm_variance_forecasts(features)
+
+
+def test_rejects_empty_features() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        lightgbm_variance_forecasts(make_features().iloc[:0])
+
+
+def test_rejects_duplicate_dates() -> None:
+    features = make_features()
+    features.index = list(features.index[:-1]) + [features.index[-2]]
+
+    with pytest.raises(ValueError, match="duplicate dates"):
+        lightgbm_variance_forecasts(features)
+
+
+def test_rejects_unsorted_dates() -> None:
+    features = make_features().iloc[::-1]
+
+    with pytest.raises(ValueError, match="sorted by date"):
+        lightgbm_variance_forecasts(features)
+
+
+@pytest.mark.parametrize("minimum", [0, 10, 29])
+def test_rejects_too_small_training_window(minimum: int) -> None:
+    with pytest.raises(ValueError, match="at least 30"):
+        lightgbm_variance_forecasts(
+            make_features(), minimum_training_observations=minimum
+        )
+
+
+def test_rejects_invalid_reestimation_frequency() -> None:
+    with pytest.raises(ValueError, match="reestimate_every"):
+        lightgbm_variance_forecasts(
+            make_features(),
+            minimum_training_observations=40,
+            reestimate_every=0,
+        )
+
+
+def test_zero_targets_are_supported() -> None:
+    features = make_features()
+    features["target_rv_1"] = features["target_rv_1"].clip(lower=0)
+    features.iloc[70, features.columns.get_loc("target_rv_1")] = 0.0
+
+    forecasts = lightgbm_variance_forecasts(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    assert (forecasts.dropna() > 0).all()

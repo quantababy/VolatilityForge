@@ -20,6 +20,10 @@ FORECAST_FILES = {
         "gjr_garch_variance_1d",
     ),
     "HAR-RV": ("data/processed/har_rv_forecasts.parquet", "har_rv_variance_1d"),
+    "LightGBM": (
+        "data/processed/lightgbm_forecasts.parquet",
+        "lightgbm_variance_1d",
+    ),
 }
 
 
@@ -64,7 +68,12 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
     """Run pairwise EWMA comparisons and Holm-adjust p-values by HAC lag."""
     rows: list[dict[str, str | int | float]] = []
 
-    competitors = ("GARCH(1,1)", "GJR-GARCH(1,1)", "HAR-RV")
+    competitors = (
+    "GARCH(1,1)",
+    "GJR-GARCH(1,1)",
+    "HAR-RV",
+    "LightGBM",
+)
 
     for lag in HAC_LAGS:
         comparisons = []
