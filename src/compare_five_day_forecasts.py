@@ -21,9 +21,14 @@ FORECAST_FILES = {
         "data/processed/garch_five_day_forecasts.parquet",
         "garch_variance_5d",
     ),
+
     "GJR-GARCH(1,1)": (
         "data/processed/gjr_garch_five_day_forecasts.parquet",
         "gjr_garch_variance_5d",
+    ),
+    "HAR-RV": (
+        "data/processed/har_rv_five_day_forecasts.parquet",
+        "har_rv_variance_5d",
     ),
 }
 
@@ -77,7 +82,9 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
 def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
     """Compare EWMA with alternatives across HAC lag choices."""
     rows: list[dict[str, str | int | float]] = []
-    competitors = ("GARCH(1,1)", "GJR-GARCH(1,1)")
+    competitors = tuple(
+    model for model in losses.columns if model != "EWMA"
+)
 
     for lag in HAC_LAGS:
         results = []

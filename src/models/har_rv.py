@@ -116,3 +116,108 @@ def har_rv_variance_forecasts(
         forecasts.iloc[position] = forecast
 
     return forecasts
+
+
+
+def har_rv_five_day_variance_forecasts(
+    features: pd.DataFrame,
+    minimum_training_observations: int = 252,
+    reestimate_every: int = 21,
+) -> pd.Series:
+    """Forecast cumulative variance over the next five trading sessions."""
+    required = {"squared_return", "rv_5", "rv_22", "target_rv_5"}
+    missing = required - set(features.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+    if features.empty:
+        raise ValueError("features must not be empty.")
+
+    data = features.copy()
+    data.index = pd.DatetimeIndex(data.index).normalize()
+    data.index.name = "Date"
+
+    if data.index.has_duplicates:
+        raise ValueError("features contains duplicate dates.")
+    if not data.index.is_monotonic_increasing:
+        raise ValueError("features must be sorted by date.")
+    if minimum_training_observations < 30:
+        raise ValueError("minimum_training_observations must be at least 30.")
+    if reestimate_every < 1:
+        raise ValueError("reestimate_every must be at least 1.")
+
+    predictors = pd.DataFrame(
+        {
+            "daily": data["squared_return"],
+            "weekly": data["rv_5"] / 5,
+            "monthly": data["rv_22"] / 22,
+        },
+        index=data.index,
+    ).where(lambda frame: frame > 0)
+
+    log_predictors = np.log(predictors)
+    log_target = np.log(data["target_rv_5"].where(data["target_rv_5"] > 0))
+
+    valid_predictors = (
+        log_predictors.notna().all(axis=1)
+        & np.isfinite(log_predictors).all(axis=1)
+    )
+    valid_target = log_target.notna() & np.isfinite(log_target)
+
+    valid_positions = np.flatnonzero(
+        (valid_predictors & valid_target).to_numpy()
+    )
+
+    forecasts = pd.Series(
+        np.nan,
+        index=data.index,
+        name="har_rv_variance_5d",
+        dtype=float,
+    )
+
+    fitted_model = None
+    last_fit_observations = 0
+
+    # Keep the final five origins unforecasted for target alignment.
+    for position in range(len(data) - 5):
+        # A label at origin s is observable at t only if s + 5 <= t.
+        eligible = valid_positions[valid_positions <= position - 6]
+
+        if len(eligible) < minimum_training_observations:
+            continue
+        if not valid_predictors.iloc[position]:
+            continue
+
+        observations_available = len(eligible)
+        if (
+            fitted_model is None
+            or observations_available - last_fit_observations
+            >= reestimate_every
+        ):
+            fitted_model = LinearRegression()
+            fitted_model.fit(
+                log_predictors.iloc[eligible].to_numpy(),
+                log_target.iloc[eligible].to_numpy(),
+            )
+            last_fit_observations = observations_available
+
+        predicted_log_variance = float(
+            fitted_model.predict(
+                log_predictors.iloc[[position]].to_numpy()
+            )[0]
+        )
+        forecast = float(
+            np.exp(np.clip(predicted_log_variance, -700, 700))
+        )
+
+        if not np.isfinite(forecast) or forecast <= 0:
+            raise RuntimeError(
+                "HAR-RV produced an invalid five-day forecast "
+                f"at position {position}."
+            )
+
+        forecasts.iloc[position] = forecast
+
+    if forecasts.notna().sum() == 0:
+        raise ValueError("Insufficient valid observations for five-day HAR-RV.")
+
+    return forecasts

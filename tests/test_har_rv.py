@@ -1,8 +1,12 @@
-﻿import numpy as np
+
+import numpy as np
 import pandas as pd
 import pytest
 
-from src.models.har_rv import har_rv_variance_forecasts
+from src.models.har_rv import (
+    har_rv_five_day_variance_forecasts,
+    har_rv_variance_forecasts,
+)
 
 
 def make_features(n: int = 120) -> pd.DataFrame:
@@ -23,13 +27,27 @@ def make_features(n: int = 120) -> pd.DataFrame:
     )
 
 
+def add_five_day_target(features: pd.DataFrame) -> pd.DataFrame:
+    """Add the next-five-session sum of squared returns."""
+    result = features.copy()
+    result["target_rv_5"] = (
+        result["squared_return"]
+        .rolling(5, min_periods=5)
+        .sum()
+        .shift(-5)
+    )
+    return result
+
+
 def test_forecasts_preserve_index_and_name() -> None:
     features = make_features()
     forecasts = har_rv_variance_forecasts(
         features, minimum_training_observations=40, reestimate_every=10
     )
 
-    pd.testing.assert_index_equal(forecasts.index, features.index.rename("Date"))
+    pd.testing.assert_index_equal(
+        forecasts.index, features.index.rename("Date")
+    )
     assert forecasts.name == "har_rv_variance_1d"
 
 
@@ -50,7 +68,7 @@ def test_initial_forecasts_require_training_history() -> None:
         features, minimum_training_observations=40, reestimate_every=10
     )
 
-    # Monthly RV first becomes available at position 22.
+    # Monthly RV first becomes available at position 21.
     # Forty valid training rows are required before forecasting.
     assert forecasts.iloc[:61].isna().all()
     assert forecasts.iloc[61:-1].notna().all()
@@ -132,8 +150,6 @@ def test_rejects_invalid_reestimation_frequency() -> None:
 def test_forecast_does_not_use_current_or_future_target_labels() -> None:
     features = make_features()
     changed = features.copy()
-
-    # Change labels beginning at position 70 while leaving predictors intact.
     changed.iloc[70:, changed.columns.get_loc("target_rv_1")] *= 10
 
     original_forecasts = har_rv_variance_forecasts(
@@ -143,8 +159,57 @@ def test_forecast_does_not_use_current_or_future_target_labels() -> None:
         changed, minimum_training_observations=40, reestimate_every=10
     )
 
-    # Forecasts through position 70 must not use the label at position 70.
     pd.testing.assert_series_equal(
         original_forecasts.iloc[:71],
         changed_forecasts.iloc[:71],
     )
+
+
+def test_five_day_forecasts_preserve_index_and_name() -> None:
+    features = add_five_day_target(make_features())
+    forecasts = har_rv_five_day_variance_forecasts(
+        features, minimum_training_observations=40, reestimate_every=10
+    )
+
+    pd.testing.assert_index_equal(
+        forecasts.index, features.index.rename("Date")
+    )
+    assert forecasts.name == "har_rv_variance_5d"
+
+
+def test_five_day_forecasts_are_positive_and_finite() -> None:
+    features = add_five_day_target(make_features())
+    forecasts = har_rv_five_day_variance_forecasts(
+        features, minimum_training_observations=40, reestimate_every=10
+    )
+    available = forecasts.dropna()
+
+    assert len(available) > 0
+    assert np.isfinite(available).all()
+    assert (available > 0).all()
+    assert forecasts.iloc[-5:].isna().all()
+
+
+def test_five_day_forecasts_do_not_use_unobservable_training_labels() -> None:
+    features = add_five_day_target(make_features())
+    changed = features.copy()
+
+    # The label at position 70 covers outcomes through position 75.
+    changed.iloc[70, changed.columns.get_loc("target_rv_5")] *= 10
+
+    original_forecasts = har_rv_five_day_variance_forecasts(
+        features, minimum_training_observations=40, reestimate_every=10
+    )
+    changed_forecasts = har_rv_five_day_variance_forecasts(
+        changed, minimum_training_observations=40, reestimate_every=10
+    )
+
+    pd.testing.assert_series_equal(
+        original_forecasts.iloc[:76],
+        changed_forecasts.iloc[:76],
+    )
+
+
+def test_five_day_forecasts_reject_missing_target_column() -> None:
+    with pytest.raises(ValueError, match="Missing required columns"):
+        har_rv_five_day_variance_forecasts(make_features())
