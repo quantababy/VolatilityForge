@@ -8,8 +8,8 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 from src.diebold_mariano import diebold_mariano_test
+from src.evaluation_config import load_evaluation_config
 
-TEST_START = "2022-01-01"
 HAC_LAGS = (5, 10, 22)
 
 FORECAST_FILES = {
@@ -35,9 +35,11 @@ def normalized_qlike(target: pd.Series, forecast: pd.Series) -> pd.Series:
 
 def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load models and align them on common positive-target observations."""
+    test_start = load_evaluation_config()["development_start"]
+
     features = pd.read_parquet("data/processed/volatility_features.parquet")
     target = features.loc[
-        pd.Timestamp(TEST_START):, "target_rv_1"
+        pd.Timestamp(test_start):, "target_rv_1"
     ]
 
     aligned = pd.DataFrame({"target": target})
@@ -69,11 +71,11 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, str | int | float]] = []
 
     competitors = (
-    "GARCH(1,1)",
-    "GJR-GARCH(1,1)",
-    "HAR-RV",
-    "LightGBM",
-)
+        "GARCH(1,1)",
+        "GJR-GARCH(1,1)",
+        "HAR-RV",
+        "LightGBM",
+    )
 
     for lag in HAC_LAGS:
         comparisons = []
@@ -105,7 +107,9 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
                 "dm_statistic": result["dm_statistic"],
                 "p_value": result["p_value"],
                 "holm_p_value": float(adjusted_p),
-                "inference_method": "Newey-West HAC + HLN factor; t(n-1) reference",
+                "inference_method": (
+                    "Newey-West HAC + HLN factor; t(n-1) reference"
+                ),
             })
 
     return pd.DataFrame(rows)
@@ -130,7 +134,10 @@ def main() -> None:
     report.to_csv(report_path, index=False)
 
     print(f"Common observations: {len(aligned)}")
-    print(f"Evaluation period: {aligned.index.min().date()} to {aligned.index.max().date()}")
+    print(
+        "Evaluation period: "
+        f"{aligned.index.min().date()} to {aligned.index.max().date()}"
+    )
     print("\nModel comparison:")
     print(summary.to_string(index=False))
     print(f"\nDM sensitivity report saved to {report_path}")

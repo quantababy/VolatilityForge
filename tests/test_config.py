@@ -22,9 +22,9 @@ def test_forecast_horizons():
     assert config["forecast"]["horizons"] == [1, 5]
 
 
-def test_final_test_period():
+def test_development_period():
     with Path("configs/config.yaml").open(encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
-    assert config["evaluation"]["final_test_start"] == "2022-01-01"
+    assert config["evaluation"]["development_start"] == "2022-01-01"
     assert config["evaluation"]["method"] == "expanding_window"

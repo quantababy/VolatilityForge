@@ -8,8 +8,8 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 from src.diebold_mariano import diebold_mariano_test
+from src.evaluation_config import load_evaluation_config
 
-TEST_START = "2022-01-01"
 HAC_LAGS = (4, 5, 10, 22)
 
 FORECAST_FILES = {
@@ -44,11 +44,12 @@ def normalized_qlike(
 
 def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Align five-day forecasts and targets on common valid dates."""
+    test_start = load_evaluation_config()["development_start"]
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
     target = features.loc[
-        pd.Timestamp(TEST_START):, "target_rv_5"
+        pd.Timestamp(test_start):, "target_rv_5"
     ]
 
     aligned = pd.DataFrame({"target": target})

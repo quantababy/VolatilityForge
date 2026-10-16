@@ -14,7 +14,7 @@ forecast:
 
 evaluation:
   method: expanding_window
-  final_test_start: "2022-01-01"
+  development_start: "2022-01-01"
   primary_metric: qlike
   secondary_metrics:
     - mse
