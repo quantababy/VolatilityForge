@@ -21,14 +21,17 @@ Establish a reproducible baseline before expanding to other assets.
 
 Status: Accepted
 
-## D003 — Final Test Period
+## D003 — Evaluation Period Classification
 
 Decision:
-Reserve 2022 onward as the final out-of-sample test period.
+Treat 2022 onward as the development and historical evaluation period, not as an untouched final test set.
 
 Reason:
-Prevent model selection and hyperparameter tuning from using
-the final evaluation period.
+Model comparisons, model corrections, regime analysis, and strategy backtests have already used this period. Reusing it as a final holdout would overstate the independence of the evaluation.
+
+Future protocol:
+
+Define and document a prospective evaluation period after model specifications, feature definitions, hyperparameters, and evaluation procedures are frozen. Do not use results from that period to select or tune models.
 
 Status: Accepted
 

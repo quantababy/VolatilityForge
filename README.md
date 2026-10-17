@@ -17,7 +17,8 @@ statistical models, econometrics, and machine learning.
 
 - Core asset: SPY
 - Implied volatility reference: VIX
-- Final holdout period: 2022 onward
+- Development evaluation period: 2022 onward
+- Prospective final evaluation: to be defined after the evaluation protocol is frozen
 - Primary benchmark: HAR-RV
 
 ## Planned Models
@@ -41,16 +42,37 @@ statistical models, econometrics, and machine learning.
 
 ## Project Status
 
-Phase 1: Repository setup.
+Implemented:
+- Historical market-data loading and SPY/VIX alignment
+- Leakage-aware volatility feature and target construction
+- EWMA, GARCH, GJR-GARCH, HAR-RV, and LightGBM forecasts
+- One-day and five-day forecast comparisons
+- QLIKE/MSE evaluation, Diebold-Mariano comparisons, and regime analysis
+- Volatility-targeting strategy backtests with transaction costs
+- Automated tests for key forecasting and evaluation components
 
-No forecasting performance claims have been established yet.
+Current evaluation results use the development period beginning in 2022.
+They are historical research results, not evidence of performance on an
+untouched final test set.
+
+Next priorities:
+- Freeze model specifications and the evaluation protocol
+- Define a prospective evaluation period
+- Improve experiment reproducibility and reporting
+- Complete remaining planned models, dashboard, and documentation
 
 ## Reproducibility
 
-Experiments will use explicit date ranges, documented modeling
-decisions, automated tests, and time-ordered evaluation.
+Experiments use chronological walk-forward evaluation, documented modeling
+decisions, explicit evaluation settings, and automated tests.
 
-The final test period will not be used for model selection or tuning.
+The period beginning in 2022 has already been used for model selection,
+comparisons, corrections, regime analysis, and strategy backtests. It is
+therefore classified as development data, not an untouched final holdout.
+
+A prospective evaluation period must be defined after model specifications,
+feature definitions, hyperparameters, and evaluation procedures are frozen.
+Its results must not be used for model selection or tuning.
 
 ## Disclaimer
 
