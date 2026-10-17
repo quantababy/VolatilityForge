@@ -33,18 +33,13 @@ def test_lower_loss_for_model_a_gives_negative_statistic() -> None:
     assert result["dm_statistic"] < 0
     assert result["p_value"] < 0.05
 
-
-
-
-def test_drops_missing_pairs() -> None:
+def test_rejects_internal_missing_pairs_with_hac_lags() -> None:
     index = pd.RangeIndex(5)
     loss_a = pd.Series([1.0, np.nan, 3.0, 4.0, 2.0], index=index)
-    loss_b = pd.Series([2.0, 2.0, np.nan, 5.0, 4.0], index=index)
+    loss_b = pd.Series([2.0, 2.0, 3.5, 5.0, 4.0], index=index)
 
-    result = diebold_mariano_test(loss_a, loss_b)
-
-    assert result["n_observations"] == 3
-
+    with pytest.raises(ValueError, match="missing pairs"):
+        diebold_mariano_test(loss_a, loss_b, hac_lags=1)
 
 
 def test_rejects_mismatched_indexes() -> None:

@@ -26,8 +26,10 @@ def diebold_mariano_test(
     freedom is used for the p-value.
 
     For overlapping h-step forecasts, callers should generally use at least
-    h - 1 HAC lags. The correction does not guarantee exact inference under
-    arbitrary dependence or model misspecification.
+    h - 1 HAC lags. When HAC lags are used, missing loss pairs are rejected
+    because dropping them would change the temporal spacing of observations.
+    The correction does not guarantee exact inference under arbitrary
+    dependence or model misspecification.
     """
     if not loss_a.index.equals(loss_b.index):
         raise ValueError("Loss series must have identical indexes.")
@@ -47,6 +49,12 @@ def diebold_mariano_test(
         raise ValueError("forecast_horizon must be a positive integer.")
 
     valid = loss_a.notna() & loss_b.notna()
+
+    if not valid.all() and hac_lags > 0:
+        raise ValueError(
+            "Loss series contain missing pairs; HAC lag spacing would be invalid."
+        )
+
     a = loss_a.loc[valid].to_numpy(dtype=float)
     b = loss_b.loc[valid].to_numpy(dtype=float)
 
@@ -60,7 +68,9 @@ def diebold_mariano_test(
     n = len(differential)
 
     if hac_lags >= n:
-        raise ValueError("hac_lags must be smaller than the number of observations.")
+        raise ValueError(
+            "hac_lags must be smaller than the number of observations."
+        )
 
     if forecast_horizon >= n:
         raise ValueError(
@@ -75,7 +85,9 @@ def diebold_mariano_test(
 
     for lag in range(1, hac_lags + 1):
         weight = 1.0 - lag / (hac_lags + 1.0)
-        autocovariance = float(np.dot(centered[lag:], centered[:-lag]) / n)
+        autocovariance = float(
+            np.dot(centered[lag:], centered[:-lag]) / n
+        )
         long_run_variance += 2.0 * weight * autocovariance
 
     if not np.isfinite(long_run_variance) or long_run_variance <= 0:
@@ -86,7 +98,9 @@ def diebold_mariano_test(
 
     # Harvey-Leybourne-Newbold small-sample correction.
     h = forecast_horizon
-    correction_squared = (n + 1 - 2 * h + h * (h - 1) / n) / n
+    correction_squared = (
+        n + 1 - 2 * h + h * (h - 1) / n
+    ) / n
 
     if correction_squared <= 0:
         raise ValueError("HLN correction is undefined for this sample and horizon.")
