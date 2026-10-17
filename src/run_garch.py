@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.evaluation_config import load_evaluation_config
 from src.models.garch import garch_variance_forecasts
 
 
 def main() -> None:
     """Load returns, generate expanding-window forecasts, and save them."""
+    evaluation = load_evaluation_config()
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
 
     forecasts = garch_variance_forecasts(
         features["log_return"].dropna(),
-        minimum_training_observations=252,
-        reestimate_every=21,
+        minimum_training_observations=evaluation[
+            "minimum_training_observations"
+        ],
+        reestimate_every=evaluation["reestimate_every"],
     )
 
     output_path = "data/processed/garch_forecasts.parquet"

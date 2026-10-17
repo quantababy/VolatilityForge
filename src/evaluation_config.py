@@ -22,20 +22,30 @@ def load_evaluation_config() -> dict:
     if not isinstance(evaluation, dict):
         raise TypeError("Evaluation configuration must be a mapping.")
 
-    start = evaluation.get("development_start")
-    if not isinstance(start, str) or not start.strip():
-        raise ValueError(
-            "evaluation.development_start must be a non-empty date string."
-        )
+    for key in ("historical_forecast_start", "development_start"):
+        value = evaluation.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"evaluation.{key} must be a non-empty date string."
+            )
 
-    try:
-        parsed_start = pd.Timestamp(start)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "evaluation.development_start must be a valid date."
-        ) from exc
+        try:
+            parsed_date = pd.Timestamp(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"evaluation.{key} must be a valid date."
+            ) from exc
 
-    if pd.isna(parsed_start):
-        raise ValueError("evaluation.development_start must be a valid date.")
+        if pd.isna(parsed_date):
+            raise ValueError(
+                f"evaluation.{key} must be a valid date."
+            )
+
+    for key in ("minimum_training_observations", "reestimate_every"):
+        value = evaluation.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(
+                f"evaluation.{key} must be a positive integer."
+            )
 
     return evaluation

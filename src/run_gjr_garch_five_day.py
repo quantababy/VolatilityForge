@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.evaluation_config import load_evaluation_config
 from src.models.gjr_garch import gjr_garch_five_day_variance_forecasts
 
 
 def main() -> None:
     """Load returns, generate five-day forecasts, and save results."""
+    evaluation = load_evaluation_config()
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
@@ -23,8 +25,8 @@ def main() -> None:
 
     forecasts = gjr_garch_five_day_variance_forecasts(
         returns,
-        minimum_training_observations=252,
-        reestimate_every=21,
+        minimum_training_observations=evaluation["minimum_training_observations"],
+        reestimate_every=evaluation["reestimate_every"],
     )
 
     output_path = (

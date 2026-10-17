@@ -4,21 +4,29 @@
 from __future__ import annotations
 
 import pandas as pd
+import yaml
 
+from src.evaluation_config import load_evaluation_config
 from src.models.lightgbm_model import lightgbm_variance_forecasts
 
 
 def main() -> None:
     """Load engineered features, generate forecasts, and save results."""
+    with open("configs/config.yaml", encoding="utf-8") as file:
+        project_config = yaml.safe_load(file)
+
+    evaluation = load_evaluation_config()
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
 
     forecasts = lightgbm_variance_forecasts(
         features,
-        minimum_training_observations=252,
-        reestimate_every=21,
-        random_state=42,
+        minimum_training_observations=evaluation[
+            "minimum_training_observations"
+        ],
+        reestimate_every=evaluation["reestimate_every"],
+        random_state=project_config["project"]["random_seed"],
     )
 
     output_path = "data/processed/lightgbm_forecasts.parquet"

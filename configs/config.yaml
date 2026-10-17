@@ -14,10 +14,13 @@ forecast:
 
 evaluation:
   method: expanding_window
+  historical_forecast_start: "2001-01-03"
   development_start: "2022-01-01"
   primary_metric: qlike
   secondary_metrics:
     - mse
+  minimum_training_observations: 252
+  reestimate_every: 21
 
 models:
   ewma:

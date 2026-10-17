@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.evaluation_config import load_evaluation_config
 from src.models.har_rv import har_rv_variance_forecasts
 
 
 def main() -> None:
     """Load engineered features, generate forecasts, and save them."""
+    evaluation = load_evaluation_config()
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
 
     forecasts = har_rv_variance_forecasts(
         features,
-        minimum_training_observations=252,
-        reestimate_every=21,
+        minimum_training_observations=evaluation[
+            "minimum_training_observations"
+        ],
+        reestimate_every=evaluation["reestimate_every"],
     )
 
     output_path = "data/processed/har_rv_forecasts.parquet"

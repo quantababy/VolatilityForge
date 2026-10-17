@@ -5,16 +5,24 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.evaluation_config import load_evaluation_config
 from src.models.har_rv import har_rv_five_day_variance_forecasts
 
 
 def main() -> None:
     """Generate and save five-day HAR-RV forecasts."""
+    evaluation = load_evaluation_config()
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
 
-    forecasts = har_rv_five_day_variance_forecasts(features)
+    forecasts = har_rv_five_day_variance_forecasts(
+        features,
+        minimum_training_observations=evaluation[
+            "minimum_training_observations"
+        ],
+        reestimate_every=evaluation["reestimate_every"],
+    )
 
     output_path = "data/processed/har_rv_five_day_forecasts.parquet"
     forecasts.to_frame().to_parquet(output_path)
