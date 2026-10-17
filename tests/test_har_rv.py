@@ -213,3 +213,44 @@ def test_five_day_forecasts_do_not_use_unobservable_training_labels() -> None:
 def test_five_day_forecasts_reject_missing_target_column() -> None:
     with pytest.raises(ValueError, match="Missing required columns"):
         har_rv_five_day_variance_forecasts(make_features())
+
+
+def test_zero_current_target_does_not_suppress_one_day_forecast() -> None:
+    features = make_features()
+    position = 80
+
+    # The predictors at this date are valid, but its future target is zero.
+    features.iloc[
+        position, features.columns.get_loc("target_rv_1")
+    ] = 0.0
+
+    forecasts = har_rv_variance_forecasts(
+        features, minimum_training_observations=40, reestimate_every=10
+    )
+
+    assert np.isfinite(forecasts.iloc[position])
+    assert forecasts.iloc[position] > 0
+
+
+def test_zero_squared_return_does_not_suppress_har_forecast() -> None:
+    features = make_features()
+    position = 80
+
+    # Rebuild rolling predictors after introducing a zero return.
+    features.iloc[
+        position, features.columns.get_loc("squared_return")
+    ] = 0.0
+    features["rv_5"] = features["squared_return"].rolling(
+        5, min_periods=5
+    ).sum()
+    features["rv_22"] = features["squared_return"].rolling(
+        22, min_periods=22
+    ).sum()
+    features["target_rv_1"] = features["squared_return"].shift(-1)
+
+    forecasts = har_rv_variance_forecasts(
+        features, minimum_training_observations=40, reestimate_every=10
+    )
+
+    assert np.isfinite(forecasts.iloc[position])
+    assert forecasts.iloc[position] > 0
