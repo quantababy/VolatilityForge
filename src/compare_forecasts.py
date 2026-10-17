@@ -1,5 +1,4 @@
-
-"""Reproducible QLIKE and DM-test sensitivity analysis."""
+﻿"""Reproducible QLIKE and DM-test sensitivity analysis."""
 
 from __future__ import annotations
 
@@ -34,36 +33,45 @@ def normalized_qlike(target: pd.Series, forecast: pd.Series) -> pd.Series:
 
 
 def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load models and align them on common positive-target observations."""
+    """Return common MSE observations and positive-target QLIKE losses."""
     test_start = load_evaluation_config()["development_start"]
 
     features = pd.read_parquet("data/processed/volatility_features.parquet")
-    target = features.loc[
-        pd.Timestamp(test_start):, "target_rv_1"
-    ]
+    target = features.loc[pd.Timestamp(test_start):, "target_rv_1"]
 
     aligned = pd.DataFrame({"target": target})
     for model, (path, column) in FORECAST_FILES.items():
         frame = pd.read_parquet(path)
         aligned[model] = frame[column].reindex(target.index)
 
-    mask = (
-        aligned["target"].notna()
-        & aligned["target"].gt(0)
-        & aligned.drop(columns="target").gt(0).all(axis=1)
-    )
-    aligned = aligned.loc[mask]
+    forecast_columns = list(FORECAST_FILES)
+    valid_forecasts = (
+        aligned[forecast_columns].notna()
+        & np.isfinite(aligned[forecast_columns])
+        & aligned[forecast_columns].gt(0)
+    ).all(axis=1)
+    valid_targets = aligned["target"].notna() & np.isfinite(aligned["target"])
 
-    if aligned.empty:
-        raise ValueError("No common positive-target observations are available.")
+    mse_mask = valid_targets & aligned["target"].ge(0) & valid_forecasts
+    mse_aligned = aligned.loc[mse_mask].copy()
 
-    losses = pd.DataFrame(index=aligned.index)
-    for model in FORECAST_FILES:
-        losses[model] = normalized_qlike(
-            aligned["target"], aligned[model]
+    if mse_aligned.empty:
+        raise ValueError("No common valid observations are available for MSE.")
+
+    qlike_aligned = mse_aligned.loc[mse_aligned["target"].gt(0)].copy()
+
+    if qlike_aligned.empty:
+        raise ValueError(
+            "No common positive-target observations are available for QLIKE."
         )
 
-    return aligned, losses
+    losses = pd.DataFrame(index=qlike_aligned.index)
+    for model in FORECAST_FILES:
+        losses[model] = normalized_qlike(
+            qlike_aligned["target"], qlike_aligned[model]
+        )
+
+    return mse_aligned, losses
 
 
 def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
@@ -117,14 +125,15 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
 
 def main() -> None:
     """Generate the model-loss summary and DM sensitivity report."""
-    aligned, losses = build_comparison_frame()
+    mse_aligned, losses = build_comparison_frame()
 
     summary = pd.DataFrame({
-        "model": losses.columns,
-        "n_observations": len(losses),
+        "model": list(FORECAST_FILES),
+        "n_mse_observations": len(mse_aligned),
+        "n_qlike_observations": len(losses),
         "qlike": [losses[column].mean() for column in losses.columns],
         "mse": [
-            np.mean((aligned[column] - aligned["target"]) ** 2)
+            np.mean((mse_aligned[column] - mse_aligned["target"]) ** 2)
             for column in losses.columns
         ],
     }).sort_values("qlike")
@@ -133,10 +142,15 @@ def main() -> None:
     report_path = "reports/dm_test_sensitivity.csv"
     report.to_csv(report_path, index=False)
 
-    print(f"Common observations: {len(aligned)}")
+    print(f"MSE observations: {len(mse_aligned)}")
+    print(f"QLIKE/DM observations: {len(losses)}")
     print(
-        "Evaluation period: "
-        f"{aligned.index.min().date()} to {aligned.index.max().date()}"
+        "MSE evaluation period: "
+        f"{mse_aligned.index.min().date()} to {mse_aligned.index.max().date()}"
+    )
+    print(
+        "QLIKE/DM evaluation period: "
+        f"{losses.index.min().date()} to {losses.index.max().date()}"
     )
     print("\nModel comparison:")
     print(summary.to_string(index=False))

@@ -1,5 +1,4 @@
-
-"""Compare five-day variance forecasts and test QLIKE differences."""
+﻿"""Compare five-day variance forecasts and test QLIKE differences."""
 
 from __future__ import annotations
 
@@ -21,7 +20,6 @@ FORECAST_FILES = {
         "data/processed/garch_five_day_forecasts.parquet",
         "garch_variance_5d",
     ),
-
     "GJR-GARCH(1,1)": (
         "data/processed/gjr_garch_five_day_forecasts.parquet",
         "gjr_garch_variance_5d",
@@ -43,7 +41,7 @@ def normalized_qlike(
 
 
 def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Align five-day forecasts and targets on common valid dates."""
+    """Return common MSE observations and positive-target QLIKE losses."""
     test_start = load_evaluation_config()["development_start"]
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
@@ -59,33 +57,51 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
         aligned[model] = forecasts[column].reindex(target.index)
 
     model_columns = list(FORECAST_FILES)
-    values = aligned[["target", *model_columns]]
-
-    valid = (
-        values.notna().all(axis=1)
-        & np.isfinite(values).all(axis=1)
-        & values.gt(0).all(axis=1)
+    forecast_values = aligned[model_columns]
+    valid_forecasts = (
+        forecast_values.notna()
+        & np.isfinite(forecast_values)
+        & forecast_values.gt(0)
+    ).all(axis=1)
+    valid_targets = (
+        aligned["target"].notna()
+        & np.isfinite(aligned["target"])
     )
-    aligned = aligned.loc[valid]
 
-    if aligned.empty:
-        raise ValueError("No common positive five-day observations.")
+    mse_mask = (
+        valid_targets
+        & aligned["target"].ge(0)
+        & valid_forecasts
+    )
+    mse_aligned = aligned.loc[mse_mask].copy()
 
-    losses = pd.DataFrame(index=aligned.index)
-    for model in model_columns:
-        losses[model] = normalized_qlike(
-            aligned["target"], aligned[model]
+    if mse_aligned.empty:
+        raise ValueError("No common valid five-day observations for MSE.")
+
+    qlike_aligned = mse_aligned.loc[
+        mse_aligned["target"].gt(0)
+    ].copy()
+
+    if qlike_aligned.empty:
+        raise ValueError(
+            "No common positive-target five-day observations for QLIKE."
         )
 
-    return aligned, losses
+    losses = pd.DataFrame(index=qlike_aligned.index)
+    for model in model_columns:
+        losses[model] = normalized_qlike(
+            qlike_aligned["target"], qlike_aligned[model]
+        )
+
+    return mse_aligned, losses
 
 
 def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
     """Compare EWMA with alternatives across HAC lag choices."""
     rows: list[dict[str, str | int | float]] = []
     competitors = tuple(
-    model for model in losses.columns if model != "EWMA"
-)
+        model for model in losses.columns if model != "EWMA"
+    )
 
     for lag in HAC_LAGS:
         results = []
@@ -104,9 +120,7 @@ def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
             method="holm",
         )[1]
 
-        for (competitor, result), adjusted_p in zip(
-            results, adjusted
-        ):
+        for (competitor, result), adjusted_p in zip(results, adjusted):
             rows.append({
                 "comparison": f"EWMA vs {competitor}",
                 "n_observations": result["n_observations"],
@@ -130,16 +144,19 @@ def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
 
 def main() -> None:
     """Write five-day metrics and DM sensitivity reports."""
-    aligned, losses = build_comparison_frame()
+    mse_aligned, losses = build_comparison_frame()
 
     summary_rows = []
     for model in FORECAST_FILES:
-        errors = aligned[model] - aligned["target"]
+        errors = mse_aligned[model] - mse_aligned["target"]
         summary_rows.append({
             "model": model,
-            "n_observations": len(aligned),
-            "start_date": str(aligned.index.min().date()),
-            "end_date": str(aligned.index.max().date()),
+            "n_mse_observations": len(mse_aligned),
+            "n_qlike_observations": len(losses),
+            "mse_start_date": str(mse_aligned.index.min().date()),
+            "mse_end_date": str(mse_aligned.index.max().date()),
+            "qlike_start_date": str(losses.index.min().date()),
+            "qlike_end_date": str(losses.index.max().date()),
             "qlike": float(losses[model].mean()),
             "mse": float(np.mean(errors**2)),
         })
@@ -154,10 +171,15 @@ def main() -> None:
     dm_report.to_csv(dm_path, index=False, float_format="%.12g")
 
     print("Evaluation: development-period evidence, not an untouched holdout")
-    print(f"Observations: {len(aligned)}")
+    print(f"MSE observations: {len(mse_aligned)}")
+    print(f"QLIKE/DM observations: {len(losses)}")
     print(
-        f"Dates: {aligned.index.min().date()} to "
-        f"{aligned.index.max().date()}"
+        f"MSE dates: {mse_aligned.index.min().date()} to "
+        f"{mse_aligned.index.max().date()}"
+    )
+    print(
+        f"QLIKE/DM dates: {losses.index.min().date()} to "
+        f"{losses.index.max().date()}"
     )
     print("\nFive-day model comparison:")
     print(summary.to_string(index=False, float_format=lambda x: f"{x:.10g}"))
