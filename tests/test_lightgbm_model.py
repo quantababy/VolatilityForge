@@ -100,6 +100,28 @@ def test_future_target_changes_do_not_change_earlier_forecasts() -> None:
     )
 
 
+def test_future_predictor_changes_do_not_change_earlier_forecasts() -> None:
+    features = make_features()
+    changed = features.copy()
+    cutoff = 100
+
+    # Modify predictors only from the cutoff onward.
+    changed.loc[changed.index[cutoff]:, "VIX_Close"] *= 2
+    changed.loc[changed.index[cutoff]:, "log_return"] *= 3
+
+    kwargs = {
+        "minimum_training_observations": 40,
+        "reestimate_every": 10,
+    }
+    original_forecasts = lightgbm_variance_forecasts(features, **kwargs)
+    changed_forecasts = lightgbm_variance_forecasts(changed, **kwargs)
+
+    # Future predictors must not change forecasts made before the cutoff.
+    pd.testing.assert_series_equal(
+        original_forecasts.iloc[:cutoff],
+        changed_forecasts.iloc[:cutoff],
+    )
+
 def test_rejects_missing_columns() -> None:
     features = make_features().drop(columns=["VIX_Close"])
 
