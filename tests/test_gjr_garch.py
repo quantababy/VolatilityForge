@@ -3,10 +3,10 @@ import pandas as pd
 import pytest
 
 from src.models.gjr_garch import (
+    gjr_garch_five_day_prospective_variance_forecast,
     gjr_garch_five_day_variance_forecasts,
     gjr_garch_prospective_variance_forecast,
     gjr_garch_variance_forecasts,
-    gjr_garch_five_day_prospective_variance_forecast,
 )
 
 

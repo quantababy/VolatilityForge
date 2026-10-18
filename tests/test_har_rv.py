@@ -2,13 +2,14 @@
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.linear_model import LinearRegression
 
 from src.models.har_rv import (
-    har_rv_five_day_variance_forecasts,
-    har_rv_variance_forecasts,
-    har_rv_prospective_variance_forecast,
-    har_rv_five_day_prospective_variance_forecast,
     _five_day_eligible_training_positions,
+    har_rv_five_day_prospective_variance_forecast,
+    har_rv_five_day_variance_forecasts,
+    har_rv_prospective_variance_forecast,
+    har_rv_variance_forecasts,
 )
 
 
@@ -280,6 +281,57 @@ def test_prospective_five_day_forecast_needs_no_future_target():
 
     assert np.isfinite(forecast)
     assert forecast > 0
+
+
+def test_prospective_one_day_uses_latest_observable_training_label(
+    monkeypatch,
+) -> None:
+    features = make_features().drop(columns=["target_rv_1"])
+    captured = {}
+    original_fit = LinearRegression.fit
+
+    def recording_fit(self, X, y, *args, **kwargs):
+        captured["n_observations"] = len(y)
+        return original_fit(self, X, y, *args, **kwargs)
+
+    monkeypatch.setattr(LinearRegression, "fit", recording_fit)
+
+    har_rv_prospective_variance_forecast(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    latest_position = len(features) - 1
+    target = features["squared_return"].shift(-1)
+    predictors = pd.DataFrame(
+        {
+            "daily": features["squared_return"],
+            "weekly": features["rv_5"] / 5,
+            "monthly": features["rv_22"] / 22,
+        },
+        index=features.index,
+    )
+
+    predictors = predictors.where(predictors >= 0)
+    log_predictors = np.log(predictors.clip(lower=1e-12))
+
+    valid_predictors = (
+        log_predictors.notna().all(axis=1)
+        & np.isfinite(log_predictors).all(axis=1)
+    )
+    eligible = (
+        valid_predictors
+        & target.gt(0)
+        & target.notna()
+    )
+
+    # At the latest close, the next-day label at t-1 is observable.
+    # The label at t is not observable yet.
+    expected = int(eligible.iloc[:latest_position].sum())
+
+    assert captured["n_observations"] == expected
+
 
 def test_five_day_eligibility_excludes_labels_ending_at_origin() -> None:
     valid_training = pd.Series(True, index=range(100))

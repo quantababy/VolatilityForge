@@ -5,10 +5,10 @@ import pandas as pd
 import pytest
 
 from src.models.garch import (
+    garch_five_day_prospective_variance_forecast,
     garch_five_day_variance_forecasts,
     garch_prospective_variance_forecast,
     garch_variance_forecasts,
-    garch_five_day_prospective_variance_forecast,
 )
 
 

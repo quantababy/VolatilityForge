@@ -301,9 +301,9 @@ def har_rv_prospective_variance_forecast(
     if not valid_predictors.iloc[latest_position]:
         raise ValueError("Latest row has invalid HAR-RV predictors.")
 
-    eligible_positions = _five_day_eligible_training_positions(
-    valid_training,
-    latest_position,
+    # A one-day label at s is observable at origin t when s < t.
+    eligible_positions = np.flatnonzero(
+        valid_training.iloc[:latest_position].to_numpy()
     )
 
     if len(eligible_positions) < minimum_training_observations:
