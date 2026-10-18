@@ -70,9 +70,8 @@ def test_rejects_insufficient_training_history():
             minimum_training_observations=100,
         )
 
-
 def test_rejects_missing_columns():
-    features = make_features().drop(columns=["target_rv_5"])
+    features = make_features().drop(columns=["log_return"])
 
     with pytest.raises(ValueError, match="Missing required columns"):
         generate_ewma_forecasts(features, test_start="2020-12-01")
@@ -99,3 +98,18 @@ def test_initialization_uses_only_initial_training_window():
     assert result.loc[test_start, "ewma_variance_1d"] == pytest.approx(
         variance
     )
+
+def test_can_forecast_latest_date_without_future_targets():
+    features = make_features(n=300).drop(
+        columns=["target_rv_1", "target_rv_5"]
+    )
+
+    result = generate_ewma_forecasts(
+        features,
+        test_start=str(features.index[-1].date()),
+        minimum_training_observations=100,
+    )
+
+    assert result.index.max() == features.index[-1]
+    assert pd.notna(result.iloc[-1]["ewma_variance_1d"])
+    assert pd.notna(result.iloc[-1]["ewma_variance_5d"])

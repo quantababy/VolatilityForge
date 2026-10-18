@@ -137,3 +137,39 @@ def test_rejects_horizon_at_least_sample_size() -> None:
             pd.Series([2.0, 3.0, 4.5]),
             forecast_horizon=3,
         )
+
+def test_raw_dm_statistic_matches_statsmodels_hac() -> None:
+    import statsmodels.api as sm
+    from statsmodels.stats.sandwich_covariance import cov_hac
+
+    differential = np.array([
+        0.4, -0.2, 0.7, -0.1, 0.3, -0.5,
+        0.8, -0.2, 0.1, 0.6, -0.4, 0.2,
+    ])
+    n = len(differential)
+
+    result = diebold_mariano_test(
+        pd.Series(differential),
+        pd.Series(np.zeros(n)),
+        hac_lags=3,
+        forecast_horizon=1,
+    )
+
+    fitted = sm.OLS(
+        differential,
+        np.ones((n, 1)),
+    ).fit()
+
+    variance = cov_hac(
+        fitted,
+        nlags=3,
+        use_correction=False,
+    )[0, 0]
+
+    expected_statistic = np.mean(differential) / np.sqrt(variance)
+
+    assert result["raw_dm_statistic"] == pytest.approx(
+        expected_statistic,
+        rel=1e-12,
+        abs=1e-12,
+    )

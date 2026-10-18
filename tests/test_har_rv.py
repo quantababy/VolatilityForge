@@ -6,6 +6,9 @@ import pytest
 from src.models.har_rv import (
     har_rv_five_day_variance_forecasts,
     har_rv_variance_forecasts,
+    har_rv_prospective_variance_forecast,
+    har_rv_five_day_prospective_variance_forecast,
+    _five_day_eligible_training_positions,
 )
 
 
@@ -254,3 +257,42 @@ def test_zero_squared_return_does_not_suppress_har_forecast() -> None:
 
     assert np.isfinite(forecasts.iloc[position])
     assert forecasts.iloc[position] > 0
+
+def test_prospective_one_day_forecast_needs_no_future_target():
+    features = make_features().drop(columns=["target_rv_1"])
+
+    forecast = har_rv_prospective_variance_forecast(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
+
+def test_prospective_five_day_forecast_needs_no_future_target():
+    features = make_features().drop(columns=["target_rv_1"])
+
+    forecast = har_rv_five_day_prospective_variance_forecast(
+        features,
+        minimum_training_observations=40,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
+
+def test_five_day_eligibility_excludes_labels_ending_at_origin() -> None:
+    valid_training = pd.Series(True, index=range(100))
+    latest_position = 99
+
+    eligible = _five_day_eligible_training_positions(
+        valid_training,
+        latest_position,
+    )
+
+    # Eligible origins must be <= t-6, so their five-day labels
+    # end strictly before the latest forecast origin t.
+    assert len(eligible) == 94
+    assert eligible[0] == 0
+    assert eligible[-1] == 93
+    assert 94 not in eligible  # t-5: its label ends at t

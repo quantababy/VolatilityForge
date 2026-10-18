@@ -13,17 +13,7 @@ def generate_ewma_forecasts(
     decay: float = 0.94,
     minimum_training_observations: int = 252,
 ) -> pd.DataFrame:
-    """Generate one- and five-day EWMA variance forecasts.
-
-    Initialize variance using the first minimum_training_observations
-    pre-test returns. Process subsequent returns chronologically.
-
-    The forecast recorded at date t uses returns observed through t.
-    The one-day target at t represents the squared return on the next
-    trading day. The five-day target represents the next five squared
-    returns.
-    """
-    required = {"log_return", "target_rv_1", "target_rv_5"}
+    required = {"log_return"}
     missing = required - set(features.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
@@ -90,10 +80,14 @@ def generate_ewma_forecasts(
         if date >= test_start_date:
             forecasts.loc[date] = variance
 
-    result = pd.DataFrame(index=forecasts.index)
+            result = pd.DataFrame(index=forecasts.index)
     result["ewma_variance_1d"] = forecasts
     result["ewma_variance_5d"] = 5 * forecasts
-    result["target_rv_1"] = data.loc[result.index, "target_rv_1"]
-    result["target_rv_5"] = data.loc[result.index, "target_rv_5"]
+
+    for target_column in ("target_rv_1", "target_rv_5"):
+        if target_column in data.columns:
+            result[target_column] = data.loc[result.index, target_column]
+        else:
+            result[target_column] = np.nan
 
     return result

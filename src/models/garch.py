@@ -152,3 +152,91 @@ def garch_five_day_variance_forecasts(
         forecasts.iloc[position] = cumulative_variance
 
     return forecasts
+
+def garch_prospective_variance_forecast(
+    returns: pd.Series,
+    minimum_training_observations: int = 252,
+) -> float:
+    """Forecast next-day variance using returns through the latest close."""
+    if returns.empty:
+        raise ValueError("returns must not be empty.")
+    if returns.isna().any():
+        raise ValueError("returns must not contain missing values.")
+    if not returns.index.is_monotonic_increasing:
+        raise ValueError("returns must be sorted by index.")
+    if returns.index.has_duplicates:
+        raise ValueError("returns must not contain duplicate index values.")
+    if minimum_training_observations < 30:
+        raise ValueError("minimum_training_observations must be at least 30.")
+
+    values = returns.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("returns must contain only finite values.")
+    if len(values) < minimum_training_observations:
+        raise ValueError("Insufficient observations for GARCH estimation.")
+
+    model = arch_model(
+        values * 100,
+        mean="Zero",
+        vol="GARCH",
+        p=1,
+        q=1,
+        dist="normal",
+        rescale=False,
+    )
+    fitted_result = model.fit(disp="off")
+
+    if fitted_result.convergence_flag != 0:
+        raise RuntimeError("GARCH estimation did not converge.")
+
+    forecast = fitted_result.forecast(horizon=1, reindex=False)
+    variance = float(forecast.variance.iloc[-1, 0] / 10000)
+
+    if not np.isfinite(variance) or variance <= 0:
+        raise RuntimeError("GARCH produced an invalid variance forecast.")
+
+    return variance
+
+def garch_five_day_prospective_variance_forecast(
+    returns: pd.Series,
+    minimum_training_observations: int = 252,
+) -> float:
+    """Forecast cumulative five-day variance using returns through latest close."""
+    if returns.empty:
+        raise ValueError("returns must not be empty.")
+    if returns.isna().any():
+        raise ValueError("returns must not contain missing values.")
+    if not returns.index.is_monotonic_increasing:
+        raise ValueError("returns must be sorted by index.")
+    if returns.index.has_duplicates:
+        raise ValueError("returns must not contain duplicate index values.")
+    if minimum_training_observations < 30:
+        raise ValueError("minimum_training_observations must be at least 30.")
+
+    values = returns.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("returns must contain only finite values.")
+    if len(values) < minimum_training_observations:
+        raise ValueError("Insufficient observations for GARCH estimation.")
+
+    model = arch_model(
+        values * 100,
+        mean="Zero",
+        vol="GARCH",
+        p=1,
+        q=1,
+        dist="normal",
+        rescale=False,
+    )
+    fitted_result = model.fit(disp="off")
+
+    if fitted_result.convergence_flag != 0:
+        raise RuntimeError("GARCH estimation did not converge.")
+
+    forecast = fitted_result.forecast(horizon=5, reindex=False)
+    variance = float(forecast.variance.iloc[-1].sum() / 10000)
+
+    if not np.isfinite(variance) or variance <= 0:
+        raise RuntimeError("GARCH produced an invalid five-day variance forecast.")
+
+    return variance

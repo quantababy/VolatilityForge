@@ -4,7 +4,9 @@ import pytest
 
 from src.models.gjr_garch import (
     gjr_garch_five_day_variance_forecasts,
+    gjr_garch_prospective_variance_forecast,
     gjr_garch_variance_forecasts,
+    gjr_garch_five_day_prospective_variance_forecast,
 )
 
 
@@ -179,3 +181,25 @@ def test_future_returns_do_not_change_earlier_five_day_forecasts() -> None:
         original.iloc[:60],
         modified.iloc[:60],
     )
+
+def test_prospective_forecast_uses_latest_available_returns():
+    returns = make_returns(80)
+
+    forecast = gjr_garch_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
+
+def test_prospective_five_day_forecast_uses_latest_returns() -> None:
+    returns = make_returns(80)
+
+    forecast = gjr_garch_five_day_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0

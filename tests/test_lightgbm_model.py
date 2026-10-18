@@ -178,3 +178,19 @@ def test_zero_targets_are_supported() -> None:
     )
 
     assert (forecasts.dropna() > 0).all()
+
+def test_prospective_forecast_does_not_require_future_target() -> None:
+    from src.models.lightgbm_model import (
+        lightgbm_prospective_variance_forecast,
+    )
+
+    features = make_features().drop(columns=["target_rv_1"])
+
+    forecast = lightgbm_prospective_variance_forecast(
+        features,
+        minimum_training_observations=40,
+        reestimate_every=10,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0

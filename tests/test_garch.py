@@ -6,7 +6,9 @@ import pytest
 
 from src.models.garch import (
     garch_five_day_variance_forecasts,
+    garch_prospective_variance_forecast,
     garch_variance_forecasts,
+    garch_five_day_prospective_variance_forecast,
 )
 
 
@@ -194,3 +196,36 @@ def test_future_returns_do_not_change_earlier_five_day_forecasts() -> None:
         original.iloc[:60],
         modified.iloc[:60],
     )
+
+def test_prospective_forecast_includes_latest_date():
+    returns = make_returns(80)
+
+    forecasts = garch_variance_forecasts(
+        returns,
+        minimum_training_observations=30,
+        reestimate_every=10,
+    )
+
+    assert pd.isna(forecasts.iloc[-1])
+
+def test_prospective_forecast_uses_latest_available_returns():
+    returns = make_returns(80)
+
+    forecast = garch_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
+
+def test_prospective_five_day_forecast_uses_latest_returns() -> None:
+    returns = make_returns(80)
+
+    forecast = garch_five_day_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
