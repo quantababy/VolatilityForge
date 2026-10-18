@@ -91,3 +91,67 @@ def generate_ewma_forecasts(
             result[target_column] = np.nan
 
     return result
+
+
+def ewma_prospective_variance_forecast(
+    features: pd.DataFrame,
+    decay: float = 0.94,
+    minimum_training_observations: int = 252,
+) -> float:
+    """Forecast next-day variance using returns through the latest close."""
+    if "log_return" not in features.columns:
+        raise ValueError("features must contain 'log_return'.")
+    if features.empty:
+        raise ValueError("features must not be empty.")
+    if not 0 < decay < 1:
+        raise ValueError("decay must be strictly between 0 and 1.")
+    if minimum_training_observations < 2:
+        raise ValueError("minimum_training_observations must be at least 2.")
+
+    data = features.copy()
+    data.index = pd.DatetimeIndex(data.index).normalize()
+    data.index.name = "Date"
+
+    if data.index.has_duplicates:
+        raise ValueError("features contains duplicate dates.")
+    if not data.index.is_monotonic_increasing:
+        raise ValueError("features must be sorted by date.")
+
+    returns = data["log_return"]
+    observed_returns = returns.dropna()
+
+    if len(observed_returns) < minimum_training_observations:
+        raise ValueError("Insufficient observations to initialize EWMA.")
+
+    values = observed_returns.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Returns must be finite.")
+
+    initial_values = values[:minimum_training_observations]
+    variance = float(np.mean(initial_values**2))
+
+    if not np.isfinite(variance) or variance <= 0:
+        raise ValueError("Initial variance must be finite and positive.")
+
+    initialization_date = observed_returns.index[
+        minimum_training_observations - 1
+    ]
+
+    subsequent_returns = returns.loc[returns.index > initialization_date]
+    for observed_return in subsequent_returns:
+        if pd.isna(observed_return):
+            continue
+
+        observed_return = float(observed_return)
+        if not np.isfinite(observed_return):
+            raise ValueError("Returns must be finite.")
+
+        variance = (
+            decay * variance
+            + (1 - decay) * observed_return**2
+        )
+
+    if not np.isfinite(variance) or variance <= 0:
+        raise RuntimeError("EWMA produced an invalid variance forecast.")
+
+    return variance

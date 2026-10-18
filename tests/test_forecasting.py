@@ -2,7 +2,10 @@
 import pandas as pd
 import pytest
 
-from src.forecasting import generate_ewma_forecasts
+from src.forecasting import (
+    ewma_prospective_variance_forecast,
+    generate_ewma_forecasts,
+)
 
 
 def make_features(n=300):
@@ -113,3 +116,41 @@ def test_can_forecast_latest_date_without_future_targets():
     assert result.index.max() == features.index[-1]
     assert pd.notna(result.iloc[-1]["ewma_variance_1d"])
     assert pd.notna(result.iloc[-1]["ewma_variance_5d"])
+
+
+def test_prospective_ewma_forecast_uses_latest_observed_return():
+    features = make_features(n=300).drop(
+        columns=["target_rv_1", "target_rv_5"]
+    )
+
+    forecast = ewma_prospective_variance_forecast(
+        features,
+        decay=0.94,
+        minimum_training_observations=100,
+    )
+
+    assert np.isfinite(forecast)
+    assert forecast > 0
+
+    # Independently calculate the expected variance from the same
+    # initialization window and every subsequent observed return.
+    returns = features["log_return"]
+    variance = float(np.mean(returns.iloc[:100].to_numpy() ** 2))
+
+    for observed_return in returns.iloc[100:]:
+        variance = (
+            0.94 * variance
+            + 0.06 * observed_return**2
+        )
+
+    assert forecast == pytest.approx(variance)
+
+
+def test_prospective_ewma_rejects_insufficient_history():
+    features = make_features(n=30)
+
+    with pytest.raises(ValueError, match="Insufficient"):
+        ewma_prospective_variance_forecast(
+            features,
+            minimum_training_observations=100,
+        )
