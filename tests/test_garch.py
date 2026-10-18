@@ -1,4 +1,4 @@
-﻿"""Tests for GARCH(1,1) variance forecasting."""
+"""Tests for GARCH(1,1) variance forecasting."""
 
 import numpy as np
 import pandas as pd
@@ -229,3 +229,44 @@ def test_prospective_five_day_forecast_uses_latest_returns() -> None:
 
     assert np.isfinite(forecast)
     assert forecast > 0
+
+
+def test_five_day_forecast_sums_horizon_variances_and_scales(
+    monkeypatch,
+) -> None:
+
+    import src.models.garch as garch_module
+
+    class FakeForecast:
+        variance = pd.DataFrame(
+            [[100.0, 200.0, 300.0, 400.0, 500.0]]
+        )
+
+    class FakeResult:
+        convergence_flag = 0
+
+        def forecast(self, horizon, reindex):
+            assert horizon == 5
+            assert reindex is False
+            return FakeForecast()
+
+    class FakeModel:
+        def fit(self, disp):
+            assert disp == "off"
+            return FakeResult()
+
+    monkeypatch.setattr(
+        garch_module,
+        "arch_model",
+        lambda *args, **kwargs: FakeModel(),
+    )
+
+    returns = make_returns(35)
+    forecasts = garch_module.garch_five_day_variance_forecasts(
+        returns,
+        minimum_training_observations=30,
+        reestimate_every=10,
+    )
+
+    # (100 + 200 + 300 + 400 + 500) / 10000 = 0.15
+    assert forecasts.iloc[29] == pytest.approx(0.15)
