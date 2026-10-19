@@ -160,3 +160,41 @@ def test_five_day_hac_lags_have_pre_specified_primary_and_sensitivities():
     assert compare_five_day_forecasts.PRIMARY_HAC_LAG == 4
     assert compare_five_day_forecasts.HAC_SENSITIVITY_LAGS == (5, 10, 22)
     assert compare_five_day_forecasts.HAC_LAGS == (4, 5, 10, 22)
+
+def test_five_day_comparison_excludes_immature_targets(
+    monkeypatch,
+) -> None:
+    module = compare_five_day_forecasts
+    dates = pd.date_range("2024-01-01", periods=6, freq="D")
+
+    # The last five-day target is immature at the final forecast origin.
+    features = pd.DataFrame(
+        {"target_rv_5": [1.0, 2.0, 3.0, 4.0, 5.0, np.nan]},
+        index=dates,
+    )
+
+    monkeypatch.setattr(
+        module,
+        "load_evaluation_config",
+        lambda: {"development_start": "2024-01-01"},
+    )
+
+    def fake_read_parquet(path):
+        if path == "data/processed/volatility_features.parquet":
+            return features
+
+        column = next(
+            column
+            for _, (file_path, column) in module.FORECAST_FILES.items()
+            if file_path == path
+        )
+        return pd.DataFrame({column: 1.0}, index=dates)
+
+    monkeypatch.setattr(pd, "read_parquet", fake_read_parquet)
+
+    mse_frame, losses = module.build_comparison_frame()
+
+    assert dates[-1] not in mse_frame.index
+    assert dates[-1] not in losses.index
+    assert len(mse_frame) == 5
+    assert len(losses) == 5
