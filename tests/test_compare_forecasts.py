@@ -34,7 +34,6 @@ def test_comparison_aligns_dates_and_filters_invalid_values(
         if path == "data/processed/volatility_features.parquet":
             return features
 
-        # Deliberately omit one date to test reindexing.
         forecast_dates = dates.delete(2)
         column = next(
             column
@@ -42,8 +41,6 @@ def test_comparison_aligns_dates_and_filters_invalid_values(
             if file_path == path
         )
         values = pd.Series(1.0, index=forecast_dates, name=column)
-
-        # Include invalid values on dates that should be excluded.
         values.loc[dates[3]] = np.inf
         return values.to_frame()
 
@@ -51,8 +48,6 @@ def test_comparison_aligns_dates_and_filters_invalid_values(
 
     mse_frame, losses = module.build_comparison_frame()
 
-    # Date 2 is absent from every forecast file; date 3 has an
-    # infinite forecast; date 4 has a missing target.
     assert list(mse_frame.index) == [dates[0], dates[1], dates[5]]
     assert list(losses.index) == [dates[0], dates[5]]
     assert (mse_frame[list(module.FORECAST_FILES)] > 0).all().all()
@@ -149,25 +144,22 @@ def test_comparison_excludes_nonpositive_forecasts(
 
     mse_frame, losses = module.build_comparison_frame()
 
-    # Every model has an invalid forecast on dates[1], so that date
-    # must be removed from both evaluation samples.
     assert dates[1] not in mse_frame.index
     assert dates[1] not in losses.index
     assert len(mse_frame) == 3
     assert len(losses) == 3
+
 
 def test_five_day_hac_lags_have_pre_specified_primary_and_sensitivities():
     assert compare_five_day_forecasts.PRIMARY_HAC_LAG == 4
     assert compare_five_day_forecasts.HAC_SENSITIVITY_LAGS == (5, 10, 22)
     assert compare_five_day_forecasts.HAC_LAGS == (4, 5, 10, 22)
 
-def test_five_day_comparison_excludes_immature_targets(
-    monkeypatch,
-) -> None:
+
+def test_five_day_comparison_excludes_immature_targets(monkeypatch) -> None:
     module = compare_five_day_forecasts
     dates = pd.date_range("2024-01-01", periods=6, freq="D")
 
-    # The last five-day target is immature at the final forecast origin.
     features = pd.DataFrame(
         {"target_rv_5": [1.0, 2.0, 3.0, 4.0, 5.0, np.nan]},
         index=dates,
@@ -198,3 +190,161 @@ def test_five_day_comparison_excludes_immature_targets(
     assert dates[-1] not in losses.index
     assert len(mse_frame) == 5
     assert len(losses) == 5
+
+
+@pytest.mark.parametrize(
+    ("index", "expected_error"),
+    [
+        (
+            pd.Index(["2024-01-01", "2024-01-02"]),
+            "Feature index must be a DatetimeIndex",
+        ),
+        (
+            pd.DatetimeIndex(["2024-01-01", "2024-01-01"]),
+            "Feature index must contain unique timestamps",
+        ),
+        (
+            pd.DatetimeIndex(["2024-01-02", "2024-01-01"]),
+            "Feature index must be sorted in ascending order",
+        ),
+    ],
+)
+def test_one_day_comparison_rejects_invalid_feature_indexes(
+    monkeypatch, index, expected_error
+):
+    module = compare_forecasts
+    features = pd.DataFrame(
+        {"target_rv_1": [1.0, 2.0]},
+        index=index,
+    )
+
+    monkeypatch.setattr(
+        module,
+        "load_evaluation_config",
+        lambda: {"development_start": "2024-01-01"},
+    )
+    monkeypatch.setattr(pd, "read_parquet", lambda path: features)
+
+    expected_exception = (
+        TypeError
+        if not isinstance(index, pd.DatetimeIndex)
+        else ValueError
+    )
+
+    with pytest.raises(expected_exception, match=expected_error):
+        module.build_comparison_frame()
+
+
+@pytest.mark.parametrize(
+    ("index", "expected_error"),
+    [
+        (
+            pd.Index(["2024-01-01", "2024-01-02"]),
+            "forecast index must be a DatetimeIndex",
+        ),
+        (
+            pd.DatetimeIndex(["2024-01-01", "2024-01-01"]),
+            "forecast index must contain unique timestamps",
+        ),
+        (
+            pd.DatetimeIndex(["2024-01-02", "2024-01-01"]),
+            "forecast index must be sorted in ascending order",
+        ),
+    ],
+)
+def test_one_day_comparison_rejects_invalid_forecast_indexes(
+    monkeypatch, index, expected_error
+):
+    module = compare_forecasts
+    dates = pd.date_range("2024-01-01", periods=2, freq="D")
+    features = pd.DataFrame(
+        {"target_rv_1": [1.0, 2.0]},
+        index=dates,
+    )
+    first_path, first_column = next(iter(module.FORECAST_FILES.values()))
+
+    def fake_read_parquet(path):
+        if path == "data/processed/volatility_features.parquet":
+            return features
+        if path == first_path:
+            return pd.DataFrame({first_column: [1.0, 2.0]}, index=index)
+
+        _, column = next(
+            item
+            for item in module.FORECAST_FILES.values()
+            if item[0] == path
+        )
+        return pd.DataFrame({column: [1.0, 2.0]}, index=dates)
+
+    monkeypatch.setattr(
+        module,
+        "load_evaluation_config",
+        lambda: {"development_start": "2024-01-01"},
+    )
+    monkeypatch.setattr(pd, "read_parquet", fake_read_parquet)
+
+    expected_exception = (
+        TypeError
+        if not isinstance(index, pd.DatetimeIndex)
+        else ValueError
+    )
+
+    with pytest.raises(expected_exception, match=expected_error):
+        module.build_comparison_frame()
+
+
+def test_one_day_comparison_rejects_missing_target_column(monkeypatch):
+    module = compare_forecasts
+    features = pd.DataFrame(
+        {"other_column": [1.0]},
+        index=pd.date_range("2024-01-01", periods=1),
+    )
+
+    monkeypatch.setattr(
+        module,
+        "load_evaluation_config",
+        lambda: {"development_start": "2024-01-01"},
+    )
+    monkeypatch.setattr(pd, "read_parquet", lambda path: features)
+
+    with pytest.raises(
+        ValueError,
+        match="Feature data must contain target_rv_1",
+    ):
+        module.build_comparison_frame()
+
+
+def test_one_day_comparison_rejects_missing_forecast_column(monkeypatch):
+    module = compare_forecasts
+    dates = pd.date_range("2024-01-01", periods=2, freq="D")
+    features = pd.DataFrame(
+        {"target_rv_1": [1.0, 2.0]},
+        index=dates,
+    )
+    first_path, _ = next(iter(module.FORECAST_FILES.values()))
+
+    def fake_read_parquet(path):
+        if path == "data/processed/volatility_features.parquet":
+            return features
+        if path == first_path:
+            return pd.DataFrame({"wrong_column": [1.0, 2.0]}, index=dates)
+
+        _, column = next(
+            item
+            for item in module.FORECAST_FILES.values()
+            if item[0] == path
+        )
+        return pd.DataFrame({column: [1.0, 2.0]}, index=dates)
+
+    monkeypatch.setattr(
+        module,
+        "load_evaluation_config",
+        lambda: {"development_start": "2024-01-01"},
+    )
+    monkeypatch.setattr(pd, "read_parquet", fake_read_parquet)
+
+    with pytest.raises(
+        ValueError,
+        match="EWMA forecast data must contain ewma_variance_1d",
+    ):
+        module.build_comparison_frame()

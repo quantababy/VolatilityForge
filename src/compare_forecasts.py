@@ -1,4 +1,5 @@
-﻿"""Reproducible QLIKE and DM-test sensitivity analysis."""
+﻿
+"""Reproducible QLIKE and DM-test sensitivity analysis."""
 
 from __future__ import annotations
 
@@ -26,6 +27,20 @@ FORECAST_FILES = {
 }
 
 
+def _validate_datetime_index(index: pd.Index, label: str) -> None:
+    """Reject indexes that cannot be safely aligned by timestamp."""
+    if not isinstance(index, pd.DatetimeIndex):
+        raise TypeError(f"{label} index must be a DatetimeIndex.")
+
+    if not index.is_unique:
+        raise ValueError(f"{label} index must contain unique timestamps.")
+
+    if not index.is_monotonic_increasing:
+        raise ValueError(
+            f"{label} index must be sorted in ascending order."
+        )
+
+
 def normalized_qlike(target: pd.Series, forecast: pd.Series) -> pd.Series:
     """Return normalized QLIKE losses for strictly positive variances."""
     ratio = target / forecast
@@ -37,11 +52,23 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
     test_start = load_evaluation_config()["development_start"]
 
     features = pd.read_parquet("data/processed/volatility_features.parquet")
-    target = features.loc[pd.Timestamp(test_start):, "target_rv_1"]
+    _validate_datetime_index(features.index, "Feature")
 
+    if "target_rv_1" not in features.columns:
+        raise ValueError("Feature data must contain target_rv_1.")
+
+    target = features.loc[pd.Timestamp(test_start):, "target_rv_1"]
     aligned = pd.DataFrame({"target": target})
+
     for model, (path, column) in FORECAST_FILES.items():
         frame = pd.read_parquet(path)
+        _validate_datetime_index(frame.index, f"{model} forecast")
+
+        if column not in frame.columns:
+            raise ValueError(
+                f"{model} forecast data must contain {column}."
+            )
+
         aligned[model] = frame[column].reindex(target.index)
 
     forecast_columns = list(FORECAST_FILES)
@@ -50,6 +77,7 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
         & np.isfinite(aligned[forecast_columns])
         & aligned[forecast_columns].gt(0)
     ).all(axis=1)
+
     valid_targets = aligned["target"].notna() & np.isfinite(aligned["target"])
 
     mse_mask = valid_targets & aligned["target"].ge(0) & valid_forecasts
@@ -87,6 +115,7 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
 
     for lag in HAC_LAGS:
         comparisons = []
+
         for competitor in competitors:
             result = diebold_mariano_test(
                 losses["EWMA"],
