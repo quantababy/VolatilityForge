@@ -53,3 +53,46 @@ def test_rejects_unsorted_forecast_dates(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="EWMA forecast dates must be sorted"):
         comparison.build_comparison_frame()
+
+def test_rejects_non_datetime_feature_index(monkeypatch) -> None:
+    dates = pd.bdate_range("2022-01-03", periods=8)
+    setup_comparison_inputs(monkeypatch, dates)
+
+    features = pd.DataFrame(
+        {"target_rv_5": [np.nan] * 5 + [0.01, 0.02, 0.03]},
+        index=range(8),
+    )
+
+    original_read_parquet = pd.read_parquet
+
+    def fake_read_parquet(path, *args, **kwargs):
+        if str(path) == "data/processed/volatility_features.parquet":
+            return features
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(pd, "read_parquet", fake_read_parquet)
+
+    with pytest.raises(TypeError, match="Feature index must be a DatetimeIndex"):
+        comparison.build_comparison_frame()
+
+
+def test_rejects_missing_five_day_target_column(monkeypatch) -> None:
+    dates = pd.bdate_range("2022-01-03", periods=8)
+    setup_comparison_inputs(monkeypatch, dates)
+
+    features = pd.DataFrame(
+        {"wrong_target": [np.nan] * 5 + [0.01, 0.02, 0.03]},
+        index=dates,
+    )
+
+    original_read_parquet = pd.read_parquet
+
+    def fake_read_parquet(path, *args, **kwargs):
+        if str(path) == "data/processed/volatility_features.parquet":
+            return features
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(pd, "read_parquet", fake_read_parquet)
+
+    with pytest.raises(ValueError, match="target_rv_5"):
+        comparison.build_comparison_frame()
