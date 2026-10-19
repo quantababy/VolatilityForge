@@ -82,7 +82,10 @@ def generate_ewma_forecasts(
 
             result = pd.DataFrame(index=forecasts.index)
     result["ewma_variance_1d"] = forecasts
-    result["ewma_variance_5d"] = 5 * forecasts
+
+    # Approximate five-session cumulative variance by assuming
+    # expected daily variance remains constant over the horizon.
+    result["ewma_variance_5d"] = 5.0 * forecasts
 
     for target_column in ("target_rv_1", "target_rv_5"):
         if target_column in data.columns:
@@ -98,7 +101,11 @@ def ewma_prospective_variance_forecast(
     decay: float = 0.94,
     minimum_training_observations: int = 252,
 ) -> float:
-    """Forecast next-day variance using returns through the latest close."""
+    """Forecast next-day variance using returns through the latest close.
+
+    The corresponding five-session approximation is five times this
+    variance, assuming constant expected daily variance over the horizon.
+    """
     if "log_return" not in features.columns:
         raise ValueError("features must contain 'log_return'.")
     if features.empty:

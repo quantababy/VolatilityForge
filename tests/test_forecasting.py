@@ -193,3 +193,23 @@ def test_prospective_ewma_rejects_infinite_returns():
             features,
             minimum_training_observations=100,
         )
+
+def test_historical_five_day_ewma_uses_constant_variance_approximation():
+    features = make_features(n=300)
+    test_start = str(features.index[-1].date())
+
+    forecasts = generate_ewma_forecasts(
+        features,
+        test_start=test_start,
+        decay=0.94,
+        minimum_training_observations=100,
+    )
+
+    one_day_variance = forecasts.loc[
+        pd.Timestamp(test_start), "ewma_variance_1d"
+    ]
+    five_day_variance = forecasts.loc[
+        pd.Timestamp(test_start), "ewma_variance_5d"
+    ]
+
+    assert five_day_variance == pytest.approx(5.0 * one_day_variance)
