@@ -117,8 +117,13 @@ def _summarize_strategy(
             "return_basis": returns_column,
             "average_exposure": float(frame["position"].mean()),
             "average_turnover": float(frame["turnover"].mean()),
-            "total_transaction_cost": float(
+            "cumulative_transaction_cost_return_units": float(
                 frame["transaction_cost"].sum()
+            ),
+            "cost_convention": (
+                "excluded_gross_benchmark"
+                if benchmark
+                else "turnover_based_cost_deducted_from_net_returns"
             ),
             "is_buy_and_hold": benchmark,
         }
@@ -220,7 +225,8 @@ def generate_strategy_report(
             "maximum_drawdown",
             "average_exposure",
             "average_turnover",
-            "total_transaction_cost",
+            "cumulative_transaction_cost_return_units",
+            "cost_convention",
         ]
     ]
 

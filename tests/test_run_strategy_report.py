@@ -64,6 +64,11 @@ def test_generates_report_for_all_strategies_and_benchmark(
     assert report["n_observations"].eq(5).all()
     assert report["is_buy_and_hold"].sum() == 1
     assert (report_dir / "strategy_performance.csv").is_file()
+    assert "cost_convention" in report.columns
+    assert "cumulative_transaction_cost_return_units" in report.columns
+    assert report.loc[
+        ~report["is_buy_and_hold"], "cost_convention"
+    ].eq("turnover_based_cost_deducted_from_net_returns").all()
 
 
 def test_buy_and_hold_uses_same_period_realized_returns(
@@ -83,7 +88,11 @@ def test_buy_and_hold_uses_same_period_realized_returns(
     assert benchmark["model"] == "Buy-and-hold (1x, gross)"
     assert benchmark["total_return"] == pytest.approx(expected_return)
     assert benchmark["average_exposure"] == pytest.approx(1.0)
-    assert benchmark["total_transaction_cost"] == pytest.approx(0.0)
+    assert (
+        benchmark["cumulative_transaction_cost_return_units"]
+        == pytest.approx(0.0)
+    )
+    assert benchmark["cost_convention"] == "excluded_gross_benchmark"
 
 
 def test_rejects_missing_strategy_file(tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-
+﻿
 """Leakage-aware volatility-targeting strategy backtest."""
 
 from __future__ import annotations
@@ -14,16 +14,19 @@ def run_volatility_target_backtest(
     max_leverage: float = 1.0,
     transaction_cost_bps: float = 5.0,
     trading_days_per_year: int = 252,
+    initial_exposure: float = 0.0,
 ) -> pd.DataFrame:
     """Backtest a long-only volatility-targeting strategy.
 
     A forecast at date t determines exposure for the return from
     close t to close t+1. Transaction costs are charged on changes
     in exposure. Forecast dates must be consecutive trading sessions.
+    The first turnover is measured relative to ``initial_exposure``.
 
     Remove unavailable warm-up forecasts before calling this function.
     Missing, infinite, or nonpositive forecast values are rejected.
     """
+
     if features.empty:
         raise ValueError("features must not be empty.")
     if forecasts.empty:
@@ -50,6 +53,15 @@ def run_volatility_target_backtest(
         )
     if not np.isfinite(max_leverage) or max_leverage <= 0:
         raise ValueError("max_leverage must be finite and positive.")
+    if (
+        not np.isfinite(initial_exposure)
+        or initial_exposure < 0
+        or initial_exposure > max_leverage
+    ):
+        raise ValueError(
+            "initial_exposure must be finite and between 0 and max_leverage."
+        )
+
     if (
         not np.isfinite(transaction_cost_bps)
         or transaction_cost_bps < 0
@@ -120,8 +132,11 @@ def run_volatility_target_backtest(
         daily_target_volatility / forecast_daily_volatility
     ).clip(lower=0.0, upper=max_leverage)
 
-    # Assume zero exposure before the first backtest session.
-    previous_position = aligned["position"].shift(1).fillna(0.0)
+    # Charge entry turnover relative to the configured starting exposure.
+    previous_position = aligned["position"].shift(1).fillna(
+        initial_exposure
+    )
+
     aligned["turnover"] = (
         aligned["position"] - previous_position
     ).abs()

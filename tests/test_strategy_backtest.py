@@ -149,3 +149,46 @@ def test_rejects_forecast_dates_with_internal_gaps() -> None:
 
     with pytest.raises(ValueError, match="consecutive"):
         run_volatility_target_backtest(features, forecasts)
+
+def test_default_initial_exposure_charges_full_entry_turnover() -> None:
+    result = run_volatility_target_backtest(
+        make_features(),
+        make_forecasts(),
+        max_leverage=1.0,
+    )
+
+    assert result["turnover"].iloc[0] == pytest.approx(
+        result["position"].iloc[0]
+    )
+
+
+def test_initial_exposure_changes_first_turnover_only() -> None:
+    features = make_features()
+    forecasts = make_forecasts()
+
+    zero_start = run_volatility_target_backtest(
+        features, forecasts, initial_exposure=0.0
+    )
+    invested_start = run_volatility_target_backtest(
+        features, forecasts, initial_exposure=0.5
+    )
+
+    assert invested_start["turnover"].iloc[0] == pytest.approx(
+        abs(invested_start["position"].iloc[0] - 0.5)
+    )
+    pd.testing.assert_series_equal(
+        zero_start["turnover"].iloc[1:],
+        invested_start["turnover"].iloc[1:],
+        check_names=False,
+    )
+
+
+@pytest.mark.parametrize("initial_exposure", [-0.1, 1.1, np.nan, np.inf])
+def test_rejects_invalid_initial_exposure(initial_exposure) -> None:
+    with pytest.raises(ValueError, match="initial_exposure"):
+        run_volatility_target_backtest(
+            make_features(),
+            make_forecasts(),
+            max_leverage=1.0,
+            initial_exposure=initial_exposure,
+        )
