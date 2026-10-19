@@ -86,3 +86,27 @@ def test_rejects_no_valid_pairs() -> None:
             pd.Series([np.nan]),
             pd.Series([np.nan]),
         )
+
+
+def test_rejects_infinite_forecasts() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        evaluate_variance_forecasts(
+            pd.Series([np.inf]),
+            pd.Series([1.0]),
+        )
+
+
+def test_rejects_infinite_targets() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        evaluate_variance_forecasts(
+            pd.Series([1.0]),
+            pd.Series([np.inf]),
+        )
+
+
+def test_rejects_infinite_targets() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        evaluate_variance_forecasts(
+            pd.Series([1.0]),
+            pd.Series([np.inf]),
+        )
