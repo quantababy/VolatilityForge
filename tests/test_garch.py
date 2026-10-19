@@ -270,3 +270,44 @@ def test_five_day_forecast_sums_horizon_variances_and_scales(
 
     # (100 + 200 + 300 + 400 + 500) / 10000 = 0.15
     assert forecasts.iloc[29] == pytest.approx(0.15)
+
+
+def test_prospective_five_day_forecast_fits_on_latest_available_returns(
+    monkeypatch,
+) -> None:
+    import src.models.garch as garch_module
+
+    returns = make_returns(80)
+    captured = {}
+
+    class FakeForecast:
+        variance = pd.DataFrame([[100.0, 200.0, 300.0, 400.0, 500.0]])
+
+    class FakeResult:
+        convergence_flag = 0
+
+        def forecast(self, horizon, reindex):
+            assert horizon == 5
+            assert reindex is False
+            return FakeForecast()
+
+    class FakeModel:
+        def fit(self, disp):
+            assert disp == "off"
+            return FakeResult()
+
+    def fake_arch_model(data, **kwargs):
+        captured["training_returns"] = np.asarray(data).copy()
+        return FakeModel()
+
+    monkeypatch.setattr(garch_module, "arch_model", fake_arch_model)
+
+    garch_module.garch_five_day_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    np.testing.assert_allclose(
+        captured["training_returns"],
+        returns.to_numpy() * 100,
+    )
