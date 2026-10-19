@@ -9,7 +9,9 @@ from statsmodels.stats.multitest import multipletests
 from src.diebold_mariano import diebold_mariano_test
 from src.evaluation_config import load_evaluation_config
 
-HAC_LAGS = (4, 5, 10, 22)
+PRIMARY_HAC_LAG = 4
+HAC_SENSITIVITY_LAGS = (5, 10, 22)
+HAC_LAGS = (PRIMARY_HAC_LAG, *HAC_SENSITIVITY_LAGS)
 
 FORECAST_FILES = {
     "EWMA": (
@@ -97,7 +99,7 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
-    """Compare EWMA with alternatives across HAC lag choices."""
+    """Compare EWMA with alternatives using primary and sensitivity HAC lags."""
     rows: list[dict[str, str | int | float]] = []
     competitors = tuple(
         model for model in losses.columns if model != "EWMA"

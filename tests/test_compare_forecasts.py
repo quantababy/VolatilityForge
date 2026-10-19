@@ -155,3 +155,8 @@ def test_comparison_excludes_nonpositive_forecasts(
     assert dates[1] not in losses.index
     assert len(mse_frame) == 3
     assert len(losses) == 3
+
+def test_five_day_hac_lags_have_pre_specified_primary_and_sensitivities():
+    assert compare_five_day_forecasts.PRIMARY_HAC_LAG == 4
+    assert compare_five_day_forecasts.HAC_SENSITIVITY_LAGS == (5, 10, 22)
+    assert compare_five_day_forecasts.HAC_LAGS == (4, 5, 10, 22)
