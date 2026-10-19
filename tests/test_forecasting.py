@@ -154,3 +154,38 @@ def test_prospective_ewma_rejects_insufficient_history():
             features,
             minimum_training_observations=100,
         )
+
+def test_prospective_ewma_rejects_infinite_returns():
+    features = make_features(n=300).drop(
+        columns=["target_rv_1", "target_rv_5"]
+    )
+    features.iloc[-1, features.columns.get_loc("log_return")] = np.inf
+
+    with pytest.raises(ValueError, match="finite"):
+        ewma_prospective_variance_forecast(
+            features,
+            minimum_training_observations=100,
+        )
+
+def test_prospective_ewma_rejects_insufficient_history():
+    features = make_features(n=30)
+
+    with pytest.raises(ValueError, match="Insufficient"):
+        ewma_prospective_variance_forecast(
+            features,
+            minimum_training_observations=100,
+        )
+
+
+def test_prospective_ewma_rejects_infinite_returns():
+    features = make_features(n=300).drop(
+        columns=["target_rv_1", "target_rv_5"]
+    )
+    features.iloc[-1, features.columns.get_loc("log_return")] = np.inf
+
+    with pytest.raises(ValueError, match="finite"):
+        ewma_prospective_variance_forecast(
+            features,
+            minimum_training_observations=100,
+        )
+
