@@ -116,7 +116,12 @@ def test_hln_correction_uses_forecast_horizon() -> None:
     assert one_step["hln_correction_factor"] == pytest.approx(
     np.sqrt(19 / 20)
 )
-    assert five_step["hln_correction_factor"] < 1.0
+    expected_squared = (
+    20 + 1 - 2 * 5 + 5 * (5 - 1) / 20
+    ) / 20
+    assert five_step["hln_correction_factor"] == pytest.approx(
+        np.sqrt(expected_squared)
+    )
     assert five_step["forecast_horizon"] == 5
 
 

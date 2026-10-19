@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,6 +38,7 @@ FIVE_DAY_OUTPUT = (
 )
 
 
+
 def _forecast_record(
     model: str,
     horizon_days: int,
@@ -45,7 +47,7 @@ def _forecast_record(
     generated_at_utc: str,
 ) -> dict:
     """Validate and standardize one prospective forecast."""
-    if not isinstance(variance, (int, float)) or not pd.notna(variance):
+    if not isinstance(variance, (int, float)) or not math.isfinite(variance):
         raise ValueError(f"{model} returned an invalid forecast.")
 
     if variance <= 0:
@@ -58,6 +60,7 @@ def _forecast_record(
         "variance_forecast": float(variance),
         "generated_at_utc": generated_at_utc,
     }
+
 
 
 def main() -> None:
