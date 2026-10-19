@@ -194,3 +194,61 @@ def test_prospective_forecast_does_not_require_future_target() -> None:
 
     assert np.isfinite(forecast)
     assert forecast > 0
+
+
+def test_prospective_forecast_uses_only_matured_training_labels(
+    monkeypatch,
+) -> None:
+    import src.models.lightgbm_model as lightgbm_module
+
+    features = make_features(100).drop(columns=["target_rv_1"])
+    captured = {}
+
+    class FakeModel:
+        def __init__(self, **kwargs):
+            pass
+
+        def fit(self, X, y):
+            captured["X"] = X.copy()
+            captured["y"] = y.copy()
+            return self
+
+        def predict(self, X):
+            return np.array([1e-4])
+
+    monkeypatch.setattr(
+        lightgbm_module,
+        "LGBMRegressor",
+        FakeModel,
+    )
+
+    lightgbm_module.lightgbm_prospective_variance_forecast(
+        features,
+        minimum_training_observations=30,
+    )
+
+    # A target at date s is the squared return at s+1.
+    # Only dates strictly before the latest forecast origin may train.
+    latest_position = len(features) - 1
+    predictors = features.loc[:, lightgbm_module.FEATURE_COLUMNS]
+    target = features["squared_return"].shift(-1)
+
+    finite_predictors = np.isfinite(predictors.to_numpy()).all(axis=1)
+    valid_predictors = (
+        predictors.notna().all(axis=1)
+        & pd.Series(finite_predictors, index=features.index)
+    )
+    valid_targets = target.notna() & np.isfinite(target) & (target >= 0)
+    valid_training = valid_predictors & valid_targets
+
+    expected_positions = np.flatnonzero(
+        valid_training.iloc[:latest_position].to_numpy()
+    )
+
+    assert captured["X"].index.equals(features.index[expected_positions])
+    pd.testing.assert_series_equal(
+        captured["y"],
+        target.iloc[expected_positions],
+        check_names=False,
+    )
+    assert features.index[-1] not in captured["X"].index
