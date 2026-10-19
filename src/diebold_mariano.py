@@ -39,8 +39,6 @@ def diebold_mariano_test(
 
     if not loss_a.index.equals(loss_b.index):
         raise ValueError("Loss series must have identical indexes.")
-    if not loss_a.index.equals(loss_b.index):
-        raise ValueError("Loss series must have identical indexes.")
 
     if (
         not isinstance(hac_lags, int)
