@@ -1,3 +1,6 @@
+
+"""Tests for GJR-GARCH(1,1) variance forecasting."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,6 +14,7 @@ from src.models.gjr_garch import (
 
 
 def make_returns(n: int = 90) -> pd.Series:
+    """Create reproducible synthetic daily returns."""
     rng = np.random.default_rng(42)
     values = rng.normal(0, 0.01, n)
     index = pd.bdate_range("2020-01-01", periods=n)
@@ -20,7 +24,9 @@ def make_returns(n: int = 90) -> pd.Series:
 def test_forecasts_preserve_index_and_name() -> None:
     returns = make_returns()
     forecasts = gjr_garch_variance_forecasts(
-        returns, minimum_training_observations=40, reestimate_every=10
+        returns,
+        minimum_training_observations=40,
+        reestimate_every=10,
     )
 
     pd.testing.assert_index_equal(forecasts.index, returns.index)
@@ -32,7 +38,9 @@ def test_forecasts_respect_initial_training_window() -> None:
     minimum = 40
 
     forecasts = gjr_garch_variance_forecasts(
-        returns, minimum_training_observations=minimum, reestimate_every=10
+        returns,
+        minimum_training_observations=minimum,
+        reestimate_every=10,
     )
 
     assert forecasts.iloc[: minimum - 1].isna().all()
@@ -93,7 +101,8 @@ def test_rejects_duplicate_index() -> None:
 def test_rejects_too_small_training_window(minimum: int) -> None:
     with pytest.raises(ValueError, match="at least 30"):
         gjr_garch_variance_forecasts(
-            make_returns(), minimum_training_observations=minimum
+            make_returns(),
+            minimum_training_observations=minimum,
         )
 
 
@@ -109,13 +118,17 @@ def test_rejects_invalid_reestimation_frequency() -> None:
 def test_future_returns_do_not_change_earlier_forecasts() -> None:
     returns = make_returns(100)
     changed = returns.copy()
-    changed.iloc[60:] = changed.iloc[60:] * 3
+    changed.iloc[60:] *= 3
 
     original_forecasts = gjr_garch_variance_forecasts(
-        returns, minimum_training_observations=40, reestimate_every=10
+        returns,
+        minimum_training_observations=40,
+        reestimate_every=10,
     )
     changed_forecasts = gjr_garch_variance_forecasts(
-        changed, minimum_training_observations=40, reestimate_every=10
+        changed,
+        minimum_training_observations=40,
+        reestimate_every=10,
     )
 
     pd.testing.assert_series_equal(
@@ -182,7 +195,8 @@ def test_future_returns_do_not_change_earlier_five_day_forecasts() -> None:
         modified.iloc[:60],
     )
 
-def test_prospective_forecast_uses_latest_available_returns():
+
+def test_prospective_forecast_uses_latest_available_returns() -> None:
     returns = make_returns(80)
 
     forecast = gjr_garch_prospective_variance_forecast(
@@ -192,6 +206,7 @@ def test_prospective_forecast_uses_latest_available_returns():
 
     assert np.isfinite(forecast)
     assert forecast > 0
+
 
 def test_prospective_five_day_forecast_uses_latest_returns() -> None:
     returns = make_returns(80)
@@ -243,3 +258,47 @@ def test_five_day_forecast_sums_horizon_variances_and_scales(
 
     # (100 + 200 + 300 + 400 + 500) / 10000 = 0.15
     assert forecasts.iloc[29] == pytest.approx(0.15)
+
+
+def test_prospective_five_day_forecast_fits_on_latest_available_returns(
+    monkeypatch,
+) -> None:
+    import src.models.gjr_garch as gjr_module
+
+    returns = make_returns(80)
+    captured = {}
+
+    class FakeForecast:
+        variance = pd.DataFrame(
+            [[100.0, 200.0, 300.0, 400.0, 500.0]]
+        )
+
+    class FakeResult:
+        convergence_flag = 0
+
+        def forecast(self, horizon, reindex):
+            assert horizon == 5
+            assert reindex is False
+            return FakeForecast()
+
+    class FakeModel:
+        def fit(self, disp):
+            assert disp == "off"
+            return FakeResult()
+
+    def fake_arch_model(data, **kwargs):
+        captured["training_returns"] = np.asarray(data).copy()
+        assert kwargs["o"] == 1
+        return FakeModel()
+
+    monkeypatch.setattr(gjr_module, "arch_model", fake_arch_model)
+
+    gjr_module.gjr_garch_five_day_prospective_variance_forecast(
+        returns,
+        minimum_training_observations=30,
+    )
+
+    np.testing.assert_allclose(
+        captured["training_returns"],
+        returns.to_numpy() * 100,
+    )
