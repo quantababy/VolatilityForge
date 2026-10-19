@@ -48,6 +48,11 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
     features = pd.read_parquet(
         "data/processed/volatility_features.parquet"
     )
+    if features.index.has_duplicates:
+        raise ValueError("Feature dates must be unique.")
+    if not features.index.is_monotonic_increasing:
+        raise ValueError("Feature dates must be sorted.")
+
     target = features.loc[
         pd.Timestamp(test_start):, "target_rv_5"
     ]
