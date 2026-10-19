@@ -173,3 +173,26 @@ def test_raw_dm_statistic_matches_statsmodels_hac() -> None:
         rel=1e-12,
         abs=1e-12,
     )
+
+def test_rejects_unsorted_loss_indexes() -> None:
+    loss_a = pd.Series(
+        [1.0, 2.0, 3.0],
+        index=pd.DatetimeIndex(
+            ["2024-01-03", "2024-01-01", "2024-01-02"]
+        ),
+    )
+    loss_b = loss_a + 0.5
+
+    with pytest.raises(ValueError, match="sorted chronologically"):
+        diebold_mariano_test(loss_a, loss_b, hac_lags=1)
+
+
+def test_rejects_duplicate_loss_indexes() -> None:
+    index = pd.DatetimeIndex(
+        ["2024-01-01", "2024-01-01", "2024-01-02"]
+    )
+    loss_a = pd.Series([1.0, 2.0, 3.0], index=index)
+    loss_b = pd.Series([1.5, 2.5, 3.5], index=index)
+
+    with pytest.raises(ValueError, match="duplicates"):
+        diebold_mariano_test(loss_a, loss_b, hac_lags=1)

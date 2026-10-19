@@ -31,6 +31,14 @@ def diebold_mariano_test(
     The correction does not guarantee exact inference under arbitrary
     dependence or model misspecification.
     """
+    for name, losses in (("loss_a", loss_a), ("loss_b", loss_b)):
+        if losses.index.has_duplicates:
+            raise ValueError(f"{name} index must not contain duplicates.")
+        if not losses.index.is_monotonic_increasing:
+            raise ValueError(f"{name} index must be sorted chronologically.")
+
+    if not loss_a.index.equals(loss_b.index):
+        raise ValueError("Loss series must have identical indexes.")
     if not loss_a.index.equals(loss_b.index):
         raise ValueError("Loss series must have identical indexes.")
 

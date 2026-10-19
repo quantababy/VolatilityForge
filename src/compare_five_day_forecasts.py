@@ -61,6 +61,24 @@ def build_comparison_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
 
     for model, (path, column) in FORECAST_FILES.items():
         forecasts = pd.read_parquet(path)
+
+        if not isinstance(forecasts.index, pd.DatetimeIndex):
+            raise TypeError(
+                f"{model} forecast index must be a DatetimeIndex."
+            )
+        if forecasts.index.has_duplicates:
+            raise ValueError(
+                f"{model} forecast dates must be unique."
+            )
+        if not forecasts.index.is_monotonic_increasing:
+            raise ValueError(
+                f"{model} forecast dates must be sorted."
+            )
+        if column not in forecasts.columns:
+            raise ValueError(
+                f"{column!r} not found in {path}."
+            )
+
         aligned[model] = forecasts[column].reindex(target.index)
 
     model_columns = list(FORECAST_FILES)
