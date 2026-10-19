@@ -1,3 +1,4 @@
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -33,6 +34,7 @@ def test_forecasts_begin_at_test_start_and_have_both_horizons():
     assert "ewma_variance_1d" in result
     assert "ewma_variance_5d" in result
     assert (result["ewma_variance_1d"] > 0).all()
+
     np.testing.assert_allclose(
         result["ewma_variance_5d"],
         5 * result["ewma_variance_1d"],
@@ -58,7 +60,9 @@ def test_future_returns_do_not_change_earlier_forecasts():
         minimum_training_observations=100,
     )
 
-    assert original.loc[test_start, "ewma_variance_1d"] == pytest.approx(
+    assert original.loc[
+        test_start, "ewma_variance_1d"
+    ] == pytest.approx(
         modified.loc[test_start, "ewma_variance_1d"]
     )
 
@@ -73,17 +77,32 @@ def test_rejects_insufficient_training_history():
             minimum_training_observations=100,
         )
 
+
 def test_rejects_missing_columns():
     features = make_features().drop(columns=["log_return"])
 
     with pytest.raises(ValueError, match="Missing required columns"):
-        generate_ewma_forecasts(features, test_start="2020-12-01")
+        generate_ewma_forecasts(
+            features,
+            test_start="2020-12-01",
+        )
+
 
 def test_initialization_uses_only_initial_training_window():
     features = make_features(n=12)
     features["log_return"] = [
-        0.01, -0.02, 0.03, 0.04, -0.01, 0.02,
-        -0.03, 0.01, 0.02, -0.01, 0.03, -0.02,
+        0.01,
+        -0.02,
+        0.03,
+        0.04,
+        -0.01,
+        0.02,
+        -0.03,
+        0.01,
+        0.02,
+        -0.01,
+        0.03,
+        -0.02,
     ]
     test_start = features.index[6]
 
@@ -95,12 +114,17 @@ def test_initialization_uses_only_initial_training_window():
     )
 
     variance = np.mean(features["log_return"].iloc[:2] ** 2)
-    for observed_return in features["log_return"].iloc[2:7]:
-        variance = 0.5 * variance + 0.5 * observed_return**2
 
-    assert result.loc[test_start, "ewma_variance_1d"] == pytest.approx(
-        variance
-    )
+    for observed_return in features["log_return"].iloc[2:7]:
+        variance = (
+            0.5 * variance
+            + 0.5 * observed_return**2
+        )
+
+    assert result.loc[
+        test_start, "ewma_variance_1d"
+    ] == pytest.approx(variance)
+
 
 def test_can_forecast_latest_date_without_future_targets():
     features = make_features(n=300).drop(
@@ -155,15 +179,17 @@ def test_prospective_ewma_rejects_insufficient_history():
             minimum_training_observations=100,
         )
 
+
 def test_prospective_ewma_rejects_infinite_returns():
     features = make_features(n=300).drop(
         columns=["target_rv_1", "target_rv_5"]
     )
-    features.iloc[-1, features.columns.get_loc("log_return")] = np.inf
+    features.iloc[
+        -1, features.columns.get_loc("log_return")
+    ] = np.inf
 
     with pytest.raises(ValueError, match="finite"):
         ewma_prospective_variance_forecast(
             features,
             minimum_training_observations=100,
         )
-
