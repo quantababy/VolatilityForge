@@ -348,3 +348,50 @@ def test_five_day_eligibility_excludes_labels_ending_at_origin() -> None:
     assert eligible[0] == 0
     assert eligible[-1] == 93
     assert 94 not in eligible  # t-5: its label ends at t
+
+def test_prospective_five_day_uses_only_fully_matured_labels(
+    monkeypatch,
+) -> None:
+    features = add_five_day_target(make_features())
+    captured = {}
+    original_fit = LinearRegression.fit
+
+    def recording_fit(self, X, y, *args, **kwargs):
+        captured["n_observations"] = len(y)
+        return original_fit(self, X, y, *args, **kwargs)
+
+    monkeypatch.setattr(LinearRegression, "fit", recording_fit)
+
+    har_rv_five_day_prospective_variance_forecast(
+        features,
+        minimum_training_observations=40,
+    )
+
+    latest_position = len(features) - 1
+    target = features["target_rv_5"]
+    predictors = pd.DataFrame(
+        {
+            "daily": features["squared_return"],
+            "weekly": features["rv_5"] / 5,
+            "monthly": features["rv_22"] / 22,
+        },
+        index=features.index,
+    )
+    log_predictors = np.log(
+        predictors.where(predictors >= 0).clip(lower=1e-12)
+    )
+
+    valid_predictors = (
+        log_predictors.notna().all(axis=1)
+        & np.isfinite(log_predictors).all(axis=1)
+    )
+    valid_training = (
+        valid_predictors
+        & target.gt(0)
+        & target.notna()
+    )
+
+    # Eligible origins are s <= t-6.
+    expected = int(valid_training.iloc[:latest_position - 5].sum())
+
+    assert captured["n_observations"] == expected
