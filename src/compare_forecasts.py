@@ -169,6 +169,7 @@ def build_calibration_report(
         )
         rows.append({
             "model": model,
+            "forecast_horizon": 1,
             "start_date": str(mse_aligned.index.min().date()),
             "end_date": str(mse_aligned.index.max().date()),
             **result,

@@ -188,6 +188,7 @@ def build_calibration_report(
         )
         rows.append({
             "model": model,
+            "forecast_horizon": 5,
             "start_date": str(mse_aligned.index.min().date()),
             "end_date": str(mse_aligned.index.max().date()),
             **result,
@@ -221,6 +222,7 @@ def main() -> None:
             "qlike_end_date": str(losses.index.max().date()),
             "qlike": float(losses[model].mean()),
             "mse": float(np.mean(errors**2)),
+            "forecast_horizon": 5,
         })
 
     summary = pd.DataFrame(summary_rows).sort_values("qlike")
