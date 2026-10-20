@@ -82,6 +82,8 @@ the provider revises its data.
 - Diebold–Mariano forecast comparisons and HAC-lag sensitivity analysis
 - Volatility-regime analysis
 - Volatility-targeting strategy backtests with transaction costs
+- Strategy performance reports with gross/net returns and a same-period gross buy-and-hold benchmark
+- Strategy sensitivity analysis across 8%, 10%, and 12% annual volatility targets and 0, 5, 10, and 20 bps transaction costs
 - Automated tests for key forecasting and evaluation components
 
 ### Experimental Research
@@ -105,6 +107,35 @@ The correction improved aggregate QLIKE by approximately 18.54% and MSE by appro
 However, the improvement was uneven across years and realized-variance regimes. Low-realized-variance regime performance deteriorated, and QLIKE improved on 496 of 1,196 individual dates.
 
 These results are exploratory. The smearing correction has **not** been adopted in the production HAR-RV model. The results do not establish statistical significance or future performance.
+
+### Strategy Economic Evaluation
+
+The strategy backtests apply each forecast made after close on date t to the
+next session's return. Exposure is long-only and capped by the configured
+maximum leverage. Transaction costs are charged on absolute changes in
+exposure. Reports include gross and net returns, annualized return and
+volatility, zero-risk-free-rate Sharpe ratio, maximum drawdown, exposure,
+turnover, and a same-period 1x gross buy-and-hold benchmark.
+
+Generated reports:
+
+- `reports/strategy_performance.csv`
+- `reports/strategy_sensitivity.csv`
+
+The sensitivity report evaluates five forecasting models at annualized
+volatility targets of 8%, 10%, and 12%, with transaction costs of 0, 5, 10,
+and 20 basis points. It reports net performance and turnover-related costs.
+The configured baseline is a 10% volatility target, 1.0 maximum leverage, and
+5 basis points per unit of turnover.
+
+These results use the development period beginning in 2022. This period has
+already been used for model comparison and strategy analysis; it is not an
+untouched final holdout. Sensitivity analysis does not establish statistical
+robustness, live executability, or future profitability. The buy-and-hold
+benchmark is gross, while strategy net returns deduct the configured costs,
+so those comparisons are not cost-matched. Market-data providers may revise
+historical observations, and a future prospective evaluation period must be
+defined only after the protocol and model specifications are frozen.
 
 ### Next Priorities
 

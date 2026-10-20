@@ -173,6 +173,16 @@ The current configuration specifies a 10% annualized volatility target, maximum 
 
 No strategy result should be described as robust without appropriate sensitivity analysis. Historical backtests do not guarantee future performance.
 
+The current strategy sensitivity artifact is `reports/strategy_sensitivity.csv`.
+It varies the annualized volatility target across 8%, 10%, and 12%, and
+transaction costs across 0, 5, 10, and 20 basis points, for each of the five
+forecasting models. These are sensitivity checks on the development sample,
+not an independent holdout evaluation or proof of robustness. The strategy
+benchmark is 1x buy-and-hold on a gross-return basis; it excludes transaction
+costs, whereas strategy net returns deduct turnover-based costs. This difference
+must be disclosed when interpreting the comparison.
+
+
 ## 10. Reproducibility and Change Control
 
 Record the following for each reported experiment:
