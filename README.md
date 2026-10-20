@@ -40,6 +40,35 @@ A quantitative finance project for forecasting market volatility using statistic
 - `scripts/`: Reproducible analysis and experiment utilities
 - `dashboard/`: Planned interactive dashboard
 
+
+## Rebuilding the Data Pipeline
+
+From the repository root, activate the project virtual environment and run:
+
+```powershell
+python -m src.run_data_pipeline
+```
+
+The pipeline reads `configs/config.yaml`, downloads the configured SPY and
+VIX daily data, validates and saves the raw datasets, aligns both assets on
+shared dates, and rebuilds the volatility features and forward targets.
+
+Generated files:
+
+- `data/raw/spy.parquet`
+- `data/raw/vix.parquet`
+- `data/processed/spy_vix.parquet`
+- `data/processed/volatility_features.parquet`
+
+The command prints row counts and date ranges for each output. It requires
+network access for the market-data download. Its integration test mocks
+downloads and runs without network access.
+
+The pipeline rebuilds the raw Parquet files from the data provider's current
+response; it does not guarantee bit-for-bit historical reproducibility if
+the provider revises its data.
+
+
 ## Project Status
 
 ### Implemented
