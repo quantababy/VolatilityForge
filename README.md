@@ -40,7 +40,6 @@ A quantitative finance project for forecasting market volatility using statistic
 - `scripts/`: Reproducible analysis and experiment utilities
 - `dashboard/`: Planned interactive dashboard
 
-
 ## Rebuilding the Data Pipeline
 
 From the repository root, activate the project virtual environment and run:
@@ -49,9 +48,7 @@ From the repository root, activate the project virtual environment and run:
 python -m src.run_data_pipeline
 ```
 
-The pipeline reads `configs/config.yaml`, downloads the configured SPY and
-VIX daily data, validates and saves the raw datasets, aligns both assets on
-shared dates, and rebuilds the volatility features and forward targets.
+The pipeline reads `configs/config.yaml`, downloads the configured SPY and VIX daily data, validates and saves the raw datasets, aligns both assets on shared dates, and rebuilds the volatility features and forward targets.
 
 Generated files:
 
@@ -60,14 +57,9 @@ Generated files:
 - `data/processed/spy_vix.parquet`
 - `data/processed/volatility_features.parquet`
 
-The command prints row counts and date ranges for each output. It requires
-network access for the market-data download. Its integration test mocks
-downloads and runs without network access.
+The command prints row counts and date ranges for each output. It requires network access for the market-data download. Its integration test mocks downloads and runs without network access.
 
-The pipeline rebuilds the raw Parquet files from the data provider's current
-response; it does not guarantee bit-for-bit historical reproducibility if
-the provider revises its data.
-
+The pipeline rebuilds the raw Parquet files from the data provider's current response; it does not guarantee bit-for-bit historical reproducibility if the provider revises its data.
 
 ## Project Status
 
@@ -110,32 +102,38 @@ These results are exploratory. The smearing correction has **not** been adopted 
 
 ### Strategy Economic Evaluation
 
-The strategy backtests apply each forecast made after close on date t to the
-next session's return. Exposure is long-only and capped by the configured
-maximum leverage. Transaction costs are charged on absolute changes in
-exposure. Reports include gross and net returns, annualized return and
-volatility, zero-risk-free-rate Sharpe ratio, maximum drawdown, exposure,
-turnover, and a same-period 1x gross buy-and-hold benchmark.
+The strategy backtests apply each forecast made after close on date *t* to the next session's return. Exposure is long-only and capped by the configured maximum leverage. Transaction costs are charged on absolute changes in exposure.
+
+Reports include gross and net returns, annualized return and volatility, zero-risk-free-rate Sharpe ratio, maximum drawdown, exposure, turnover, and a same-period 1x gross buy-and-hold benchmark.
 
 Generated reports:
 
 - `reports/strategy_performance.csv`
 - `reports/strategy_sensitivity.csv`
 
-The sensitivity report evaluates five forecasting models at annualized
-volatility targets of 8%, 10%, and 12%, with transaction costs of 0, 5, 10,
-and 20 basis points. It reports net performance and turnover-related costs.
-The configured baseline is a 10% volatility target, 1.0 maximum leverage, and
-5 basis points per unit of turnover.
+The sensitivity report evaluates five forecasting models at annualized volatility targets of 8%, 10%, and 12%, with transaction costs of 0, 5, 10, and 20 basis points. It reports net performance and turnover-related costs. The configured baseline is a 10% volatility target, 1.0 maximum leverage, and 5 basis points per unit of turnover.
 
-These results use the development period beginning in 2022. This period has
-already been used for model comparison and strategy analysis; it is not an
-untouched final holdout. Sensitivity analysis does not establish statistical
-robustness, live executability, or future profitability. The buy-and-hold
-benchmark is gross, while strategy net returns deduct the configured costs,
-so those comparisons are not cost-matched. Market-data providers may revise
-historical observations, and a future prospective evaluation period must be
-defined only after the protocol and model specifications are frozen.
+#### Reproducing the Strategy Reports
+
+Run the following commands from the repository root with the virtual environment activated:
+
+```powershell
+python -m src.run_strategy_backtest
+python -m src.run_strategy_report
+python -m src.run_strategy_sensitivity
+```
+
+The commands perform the following tasks:
+
+1. `src.run_strategy_backtest` runs the configured volatility-targeting backtests using the saved forecasts and processed feature data.
+2. `src.run_strategy_report` generates `reports/strategy_performance.csv`.
+3. `src.run_strategy_sensitivity` evaluates the five forecasting models across the three target-volatility levels and four transaction-cost assumptions, then writes `reports/strategy_sensitivity.csv`.
+
+The processed feature data and forecast files must already exist. These commands do not independently rebuild the data pipeline or retrain forecasting models. The sensitivity runner reuses the project's strategy backtest and metrics implementations.
+
+These results use the development period beginning in 2022. This period has already been used for model comparison and strategy analysis; it is not an untouched final holdout. Sensitivity analysis does not establish statistical robustness, live executability, or future profitability.
+
+The buy-and-hold benchmark is gross, while strategy net returns deduct the configured costs, so those comparisons are not cost-matched. Market-data providers may revise historical observations, and a future prospective evaluation period must be defined only after the protocol and model specifications are frozen.
 
 ### Next Priorities
 
