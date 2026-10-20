@@ -20,14 +20,15 @@ A quantitative finance project for forecasting market volatility using statistic
 - **Prospective final evaluation:** To be defined after the evaluation protocol is frozen
 - **Primary benchmark:** HAR-RV
 
-## Planned Models
+## Forecasting Model Status
 
 - EWMA
 - GARCH and GJR-GARCH
 - HAR-RV
-- Ridge and Lasso
-- LightGBM and XGBoost
-- HAR-RV residual hybrid
+- Ridge and Lasso (not yet verified as implemented)
+- LightGBM (implemented)
+- XGBoost (not yet verified as implemented)
+- HAR-RV residual hybrid (not yet verified as implemented)
 
 ## Repository Structure
 
@@ -38,7 +39,7 @@ A quantitative finance project for forecasting market volatility using statistic
 - `tests/`: Automated tests
 - `reports/`: Forecast comparisons, statistical tests, and experiment results
 - `scripts/`: Reproducible analysis and experiment utilities
-- `dashboard/`: Planned interactive dashboard
+- `dashboard/`: Streamlit research dashboard
 
 ## Rebuilding the Data Pipeline
 
@@ -141,7 +142,17 @@ The buy-and-hold benchmark is gross, while strategy net returns deduct the confi
 2. Define a prospective evaluation period after the protocol is frozen.
 3. Preserve the prospective period for final evaluation rather than model selection or tuning.
 4. Improve experiment reproducibility, diagnostics, and reporting.
-5. Complete remaining planned models, dashboard development, and documentation.
+5. Complete the source-to-guide scope audit and release documentation.
+
+## Running the Dashboard
+
+From the repository root with the virtual environment activated:
+
+```powershell
+python -m streamlit run dashboard/app.py
+```
+
+The dashboard provides overview, model comparison, volatility regime, and strategy backtest views.
 
 ## Reproducibility and Evaluation Protocol
 
