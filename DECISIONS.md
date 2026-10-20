@@ -70,14 +70,17 @@ Machine-learning models must be compared against a meaningful volatility-specifi
 
 **Decision:**
 
-Start with the available Python 3.14.7 environment and verify dependency compatibility before relying on it.
+Use Python 3.14.7 as the current project runtime. The dependency check and tested project workflows pass in this environment.
 
 **Reason:**
 
-Scientific and quantitative-finance packages may have version-specific compatibility constraints.
+Scientific and quantitative-finance packages may have version-specific compatibility constraints. `python -m pip check` reports no broken requirements, the automated test suite passed 300 tests, and the strategy backtest, performance-report, and sensitivity-report commands completed successfully.
 
-**Status:** Pending dependency verification
+**Scope:**
 
+This evidence applies to the tested environment and workflows only. It does not guarantee compatibility across all platforms, dependency versions, or untested code paths.
+
+**Status:** Accepted — verified for tested workflows
 ## D007 — Five-Day HAR-RV OOS Smearing Experiment
 
 **Decision:**
