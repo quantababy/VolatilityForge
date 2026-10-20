@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
+from src.calibration import mincer_zarnowitz
 from src.diebold_mariano import diebold_mariano_test
 from src.evaluation_config import load_evaluation_config
 
 HAC_LAGS = (5, 10, 22)
-
+CALIBRATION_HAC_LAG = 5
 FORECAST_FILES = {
     "EWMA": ("data/processed/ewma_forecasts.parquet", "ewma_variance_1d"),
     "GARCH(1,1)": ("data/processed/garch_forecasts.parquet", "garch_variance_1d"),
@@ -152,9 +153,42 @@ def run_dm_sensitivity(losses: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_calibration_report(
+    mse_aligned: pd.DataFrame,
+    *,
+    hac_lags: int = CALIBRATION_HAC_LAG,
+) -> pd.DataFrame:
+    """Build Mincer-Zarnowitz calibration diagnostics for one-day forecasts."""
+    rows = []
+
+    for model in FORECAST_FILES:
+        result = mincer_zarnowitz(
+            target=mse_aligned["target"],
+            forecast=mse_aligned[model],
+            hac_lags=hac_lags,
+        )
+        rows.append({
+            "model": model,
+            "start_date": str(mse_aligned.index.min().date()),
+            "end_date": str(mse_aligned.index.max().date()),
+            **result,
+        })
+
+    return pd.DataFrame(rows)
+
+
+
 def main() -> None:
     """Generate the model-loss summary and DM sensitivity report."""
     mse_aligned, losses = build_comparison_frame()
+
+    calibration_report = build_calibration_report(mse_aligned)
+    calibration_path = "reports/one_day_calibration.csv"
+    calibration_report.to_csv(
+        calibration_path,
+        index=False,
+        float_format="%.12g",
+    )
 
     summary = pd.DataFrame({
         "model": list(FORECAST_FILES),
@@ -185,6 +219,8 @@ def main() -> None:
     print(summary.to_string(index=False))
     print(f"\nDM sensitivity report saved to {report_path}")
     print(report.to_string(index=False))
+    print(f"\nCalibration report saved to {calibration_path}")
+    print(calibration_report.to_string(index=False))
 
 
 if __name__ == "__main__":

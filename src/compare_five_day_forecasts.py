@@ -6,13 +6,14 @@ import numpy as np
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
+from src.calibration import mincer_zarnowitz
 from src.diebold_mariano import diebold_mariano_test
 from src.evaluation_config import load_evaluation_config
 
 PRIMARY_HAC_LAG = 4
 HAC_SENSITIVITY_LAGS = (5, 10, 22)
 HAC_LAGS = (PRIMARY_HAC_LAG, *HAC_SENSITIVITY_LAGS)
-
+CALIBRATION_HAC_LAG = 4
 FORECAST_FILES = {
     "EWMA": (
         "data/processed/ewma_forecasts.parquet",
@@ -171,9 +172,41 @@ def build_dm_report(losses: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_calibration_report(
+    mse_aligned: pd.DataFrame,
+    *,
+    hac_lags: int = CALIBRATION_HAC_LAG,
+) -> pd.DataFrame:
+    """Build Mincer-Zarnowitz calibration diagnostics for five-day forecasts."""
+    rows = []
+
+    for model in FORECAST_FILES:
+        result = mincer_zarnowitz(
+            target=mse_aligned["target"],
+            forecast=mse_aligned[model],
+            hac_lags=hac_lags,
+        )
+        rows.append({
+            "model": model,
+            "start_date": str(mse_aligned.index.min().date()),
+            "end_date": str(mse_aligned.index.max().date()),
+            **result,
+        })
+
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     """Write five-day metrics and DM sensitivity reports."""
     mse_aligned, losses = build_comparison_frame()
+
+    calibration_report = build_calibration_report(mse_aligned)
+    calibration_path = "reports/five_day_calibration.csv"
+    calibration_report.to_csv(
+        calibration_path,
+        index=False,
+        float_format="%.12g",
+    )
 
     summary_rows = []
     for model in FORECAST_FILES:
@@ -217,6 +250,11 @@ def main() -> None:
     print(dm_report.to_string(
         index=False,
         float_format=lambda x: f"{x:.8g}",
+    ))
+    print(f"\nCalibration report: {calibration_path}")
+    print(calibration_report.to_string(
+    index=False,
+    float_format=lambda x: f"{x:.8g}",
     ))
 
 

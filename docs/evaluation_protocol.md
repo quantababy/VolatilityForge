@@ -193,3 +193,21 @@ The protocol and implementation must agree. If a documented setting differs from
 - The protocol remains a draft until the wording, implementation, dependencies, and evaluation procedures have been verified and approved.
 
 **Approval requirement:** Before designating a prospective final evaluation, verify this protocol against the implementation, freeze the relevant specifications, document the code revision and dependencies, and record the approval decision.
+
+### Mincer–Zarnowitz Calibration Diagnostics
+
+For each model and forecast horizon, calibration is assessed using the regression
+
+\[
+RV_t = \alpha + \beta \widehat{RV}_t + \epsilon_t,
+\]
+
+where \(RV_t\) is the realized-variance target and \(\widehat{RV}_t\) is the corresponding variance forecast.
+
+The ideal calibration restrictions are \(\alpha=0\) and \(\beta=1\). The implementation reports the intercept and slope estimates, HAC-robust standard errors, 95% confidence intervals, \(R^2\), and a joint Wald test of these restrictions.
+
+The current report settings use 5 HAC lags for one-day forecasts and 4 HAC lags for five-day forecasts. These settings are explicit implementation choices for calibration diagnostics and should not be interpreted as automatically inherited from the Diebold–Mariano testing protocol.
+
+Calibration uses the common valid forecast-target observations in the existing MSE-aligned comparison frame. Zero-valued realized-variance targets remain eligible for calibration and MSE, while QLIKE excludes zero targets. Five-day observations are restricted to targets that have matured under the project's existing information-availability rules.
+
+Results from the current 2022-onward development period are development-period evidence, not untouched-holdout results. Failure to reject the joint restrictions does not prove that a model is perfectly calibrated, and calibration results alone do not establish forecast superiority or economic value.
