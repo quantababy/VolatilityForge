@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
-from src.compare_forecasts import run_dm_sensitivity
 from src.compare_five_day_forecasts import build_dm_report
+from src.compare_forecasts import run_dm_sensitivity
 
 
 def _synthetic_losses(
