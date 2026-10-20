@@ -348,3 +348,68 @@ def test_one_day_comparison_rejects_missing_forecast_column(monkeypatch):
         match="EWMA forecast data must contain ewma_variance_1d",
     ):
         module.build_comparison_frame()
+
+
+def test_one_day_main_writes_comparison_report_with_metadata(
+    monkeypatch, tmp_path
+):
+    module = compare_forecasts
+    dates = pd.date_range("2024-01-02", periods=3, freq="D")
+
+
+    models = list(module.FORECAST_FILES)
+
+    mse_aligned = pd.DataFrame(
+        {"target": [1.0, 2.0, 3.0]},
+        index=dates,
+    )
+    losses = pd.DataFrame(index=dates)
+
+    for i, model in enumerate(models, start=1):
+        mse_aligned[model] = [
+            1.0 + i * 0.1,
+            2.0,
+            3.0 - i * 0.1,
+        ]
+        losses[model] = [
+            0.1 * i,
+            0.2 * i,
+            0.3 * i,
+        ]
+
+
+    monkeypatch.setattr(
+        module,
+        "build_comparison_frame",
+        lambda: (mse_aligned, losses),
+    )
+    monkeypatch.setattr(
+        module,
+        "build_calibration_report",
+        lambda frame: pd.DataFrame({"model": ["EWMA"]}),
+    )
+    monkeypatch.setattr(
+        module,
+        "run_dm_sensitivity",
+        lambda frame: pd.DataFrame({"model": ["EWMA"]}),
+    )
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "reports").mkdir()
+
+    module.main()
+
+    report = pd.read_csv(
+        tmp_path / "reports" / "volatility_model_comparison.csv"
+    )
+
+    assert set(report["model"]) == set(module.FORECAST_FILES)
+    assert set(report["forecast_horizon"]) == {1}
+    assert set(report["n_mse_observations"]) == {3}
+    assert set(report["n_qlike_observations"]) == {3}
+    assert set(report["mse_start_date"]) == {"2024-01-02"}
+    assert set(report["mse_end_date"]) == {"2024-01-04"}
+    assert set(report["qlike_start_date"]) == {"2024-01-02"}
+    assert set(report["qlike_end_date"]) == {"2024-01-04"}
+    assert report["qlike"].notna().all()
+    assert report["mse"].notna().all()

@@ -190,16 +190,27 @@ def main() -> None:
         float_format="%.12g",
     )
 
-    summary = pd.DataFrame({
-        "model": list(FORECAST_FILES),
-        "n_mse_observations": len(mse_aligned),
-        "n_qlike_observations": len(losses),
-        "qlike": [losses[column].mean() for column in losses.columns],
-        "mse": [
-            np.mean((mse_aligned[column] - mse_aligned["target"]) ** 2)
-            for column in losses.columns
-        ],
-    }).sort_values("qlike")
+    summary_rows = []
+
+    for model in FORECAST_FILES:
+        mse_errors = mse_aligned[model] - mse_aligned["target"]
+
+        summary_rows.append({
+            "model": model,
+            "forecast_horizon": 1,
+            "n_mse_observations": len(mse_aligned),
+            "n_qlike_observations": len(losses),
+            "mse_start_date": str(mse_aligned.index.min().date()),
+            "mse_end_date": str(mse_aligned.index.max().date()),
+            "qlike_start_date": str(losses.index.min().date()),
+            "qlike_end_date": str(losses.index.max().date()),
+            "qlike": float(losses[model].mean()),
+            "mse": float(np.mean(mse_errors**2)),
+        })
+
+    summary = pd.DataFrame(summary_rows).sort_values("qlike")
+    summary_path = "reports/volatility_model_comparison.csv"
+    summary.to_csv(summary_path, index=False, float_format="%.12g")
 
     report = run_dm_sensitivity(losses)
     report_path = "reports/dm_test_sensitivity.csv"
@@ -221,7 +232,7 @@ def main() -> None:
     print(report.to_string(index=False))
     print(f"\nCalibration report saved to {calibration_path}")
     print(calibration_report.to_string(index=False))
-
+    print(f"\nModel comparison report saved to {summary_path}")
 
 if __name__ == "__main__":
     main()
