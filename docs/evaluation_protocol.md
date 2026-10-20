@@ -109,6 +109,16 @@ Apply Holm correction across competitor comparisons within each HAC-lag family. 
 
 The five-day forecast losses overlap, so inference must account for serial dependence. Lag sensitivity must be reported transparently; do not select a lag solely because it produces statistical significance.
 
+The DM implementation estimates the long-run variance of the paired loss
+differential using a Bartlett-weighted Newey-West HAC estimator, applies the
+Harvey-Leybourne-Newbold (HLN) finite-sample adjustment, and calculates
+two-sided p-values using a Student-t reference distribution with n - 1 degrees
+of freedom. This is an approximate inference procedure: numerical agreement
+with another implementation verifies computational consistency, not finite-sample
+size or validity under arbitrary dependence. The HLN adjustment and reference
+distribution should therefore be interpreted alongside the HAC bandwidth
+sensitivity results, particularly for overlapping five-day forecasts.
+
 Statistical significance does not establish economic significance, prove that a model is universally superior, or guarantee validity under arbitrary dependence or model misspecification.
 
 Any change to the pre-specified lag settings, comparison family, or correction procedure must be documented before a designated prospective evaluation.
