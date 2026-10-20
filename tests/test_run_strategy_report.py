@@ -6,6 +6,7 @@ import pytest
 
 from src.run_strategy_report import (
     STRATEGY_FILES,
+    _validate_strategy_config,
     generate_strategy_report,
 )
 
@@ -18,6 +19,7 @@ def make_strategy_frame() -> pd.DataFrame:
 
     returns = np.array([0.01, -0.02, 0.015, 0.005, -0.01])
     positions = np.array([0.5, 0.6, 0.4, 0.7, 0.5])
+
     turnover = np.abs(
         positions - np.concatenate(([0.0], positions[:-1]))
     )
@@ -64,11 +66,31 @@ def test_generates_report_for_all_strategies_and_benchmark(
     assert report["n_observations"].eq(5).all()
     assert report["is_buy_and_hold"].sum() == 1
     assert (report_dir / "strategy_performance.csv").is_file()
+
     assert "cost_convention" in report.columns
     assert "cumulative_transaction_cost_return_units" in report.columns
+
     assert report.loc[
         ~report["is_buy_and_hold"], "cost_convention"
     ].eq("turnover_based_cost_deducted_from_net_returns").all()
+
+    assert report["forecast_origin_start_date"].eq(
+        "2024-01-01"
+    ).all()
+    assert report["forecast_origin_end_date"].eq(
+        "2024-01-05"
+    ).all()
+    assert report["realized_return_start_date"].eq(
+        "2024-01-02"
+    ).all()
+    assert report["realized_return_end_date"].eq(
+        "2024-01-08"
+    ).all()
+
+    # Strategy assumptions must be explicit in the report.
+    assert report["target_annual_volatility"].eq(0.10).all()
+    assert report["max_leverage"].eq(1.0).all()
+    assert report["transaction_cost_bps"].eq(5.0).all()
 
 
 def test_buy_and_hold_uses_same_period_realized_returns(
@@ -83,15 +105,16 @@ def test_buy_and_hold_uses_same_period_realized_returns(
     )
     benchmark = report.loc[report["is_buy_and_hold"]].iloc[0]
 
-    expected_return = (1.01 * 0.98 * 1.015 * 1.005 * 0.99) - 1.0
+    expected_return = (
+        1.01 * 0.98 * 1.015 * 1.005 * 0.99
+    ) - 1.0
 
     assert benchmark["model"] == "Buy-and-hold (1x, gross)"
     assert benchmark["total_return"] == pytest.approx(expected_return)
     assert benchmark["average_exposure"] == pytest.approx(1.0)
-    assert (
-        benchmark["cumulative_transaction_cost_return_units"]
-        == pytest.approx(0.0)
-    )
+    assert benchmark[
+        "cumulative_transaction_cost_return_units"
+    ] == pytest.approx(0.0)
     assert benchmark["cost_convention"] == "excluded_gross_benchmark"
 
 
@@ -100,11 +123,15 @@ def test_rejects_missing_strategy_file(tmp_path: Path) -> None:
     processed_dir.mkdir()
     report_dir = tmp_path / "reports"
 
-    with pytest.raises(FileNotFoundError, match="Missing strategy output"):
+    with pytest.raises(
+        FileNotFoundError,
+        match="Missing strategy output",
+    ):
         generate_strategy_report(
             processed_dir=processed_dir,
             report_dir=report_dir,
         )
+
 
 def test_rejects_misaligned_model_dates(tmp_path: Path) -> None:
     processed_dir = tmp_path / "processed"
@@ -130,7 +157,9 @@ def test_rejects_misaligned_model_dates(tmp_path: Path) -> None:
         )
 
 
-def test_rejects_inconsistent_realized_returns(tmp_path: Path) -> None:
+def test_rejects_inconsistent_realized_returns(
+    tmp_path: Path,
+) -> None:
     processed_dir = tmp_path / "processed"
     write_all_strategy_files(processed_dir)
 
@@ -143,4 +172,14 @@ def test_rejects_inconsistent_realized_returns(tmp_path: Path) -> None:
         generate_strategy_report(
             processed_dir=processed_dir,
             report_dir=tmp_path / "reports",
+        )
+
+
+def test_rejects_missing_strategy_configuration() -> None:
+    with pytest.raises(
+        ValueError,
+        match="Missing strategy configuration keys",
+    ):
+        _validate_strategy_config(
+            {"target_annual_volatility": 0.10}
         )
