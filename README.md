@@ -1,169 +1,164 @@
-﻿# VolatilityForge
+# 📈 VolatilityForge: Quantitative Volatility Forecasting & Strategy Engine
 
-A quantitative finance project for forecasting market volatility using statistical models, econometrics, and machine learning.
+Welcome to **VolatilityForge**! ⚡ This is an end-to-end quantitative finance and machine learning project designed to forecast equity market volatility using statistical baselines, econometric models, and gradient boosting— paired with leakage-free walk-forward evaluation and realistic volatility-targeting backtests.
 
-## Objectives
+---
 
-- Forecast next-day realized variance.
-- Forecast cumulative realized variance over the next five trading days.
-- Establish statistical baselines before introducing machine learning.
-- Evaluate models using leakage-free, expanding-window walk-forward validation.
-- Compare forecasts using QLIKE as the primary metric and MSE as a secondary metric.
-- Test volatility-targeting strategies with transaction costs.
-- Provide reproducible experiments, documented decisions, and an interactive dashboard.
+## 🎯 Project Objectives & Scope
 
-## Initial Scope
+### 🧭 Core Objectives
+* **📅 Multi-Horizon Forecasting:** Predict next-day ($1\text{-day}$) and cumulative five-trading-day ($5\text{-day}$) realized variance.
+* **📊 Rigorous Baselines First:** Establish strong econometric benchmarks (`EWMA`, `GARCH`, `GJR-GARCH`, `HAR-RV`) before introducing machine learning.
+* **🛡️ Zero-Leakage Validation:** Evaluate all models via chronological, expanding-window walk-forward validation where multi-day targets must fully mature prior to training.
+* **⚖️ Loss-Function Precision:** Compare forecasts using **QLIKE** as the primary asymmetric metric and **MSE** as the secondary metric, backed by Diebold–Mariano tests and HAC-lag sensitivity analysis.
+* **💼 Economic Backtesting:** Translate variance forecasts into actionable **volatility-targeting strategies** accounting for turnover and transaction costs.
+* **🖥️ Interactive Research:** Deliver reproducible pipelines, documented research decisions, and an interactive **Streamlit** dashboard.
 
-- **Core asset:** SPY
-- **Implied volatility reference:** VIX
-- **Development evaluation period:** 2022 onward
-- **Prospective final evaluation:** To be defined after the evaluation protocol is frozen
-- **Primary benchmark:** HAR-RV
+### 🔭 Initial Scope Parameters
+| Parameter | Specification |
+| :--- | :--- |
+| **Core Asset** | `SPY` (S&P 500 ETF) |
+| **Implied Volatility Reference** | `VIX` (CBOE Volatility Index) |
+| **Primary Benchmark** | `HAR-RV` (Heterogeneous Autoregressive Realized Volatility) |
+| **Development Evaluation Period** | `2022-01-03` onward *(classified as development data)* |
+| **Prospective Final Evaluation** | To be defined *after* the evaluation protocol and model specs are frozen |
 
-## Forecasting Model Status
+---
 
-- EWMA
-- GARCH and GJR-GARCH
-- HAR-RV
-- Ridge and Lasso (not yet verified as implemented)
-- LightGBM (implemented)
-- XGBoost (not yet verified as implemented)
-- HAR-RV residual hybrid (not yet verified as implemented)
+## 🤖 Forecasting Model Status
 
-## Repository Structure
+| Model Family | Specific Implementation | Status |
+| :--- | :--- | :--- |
+| **Exponential Smoothing** | `EWMA` | ✅ Implemented |
+| **Econometric GARCH** | `GARCH(1,1)` & `GJR-GARCH` | ✅ Implemented |
+| **Autoregressive Baseline** | `HAR-RV` (1d & 5d horizons) | ✅ Implemented |
+| **Gradient Boosting** | `LightGBM` | ✅ Implemented |
+| **Linear Regularization** | `Ridge` & `Lasso` | ⏳ *Pending Verification* |
+| **Alternative Boosting** | `XGBoost` | ⏳ *Pending Verification* |
+| **Hybrid Architecture** | `HAR-RV Residual Hybrid` | ⏳ *Pending Verification* |
 
-- `configs/`: Configuration and evaluation settings
-- `data/`: Raw and processed market data
-- `src/`: Data processing, forecasting models, evaluation, and application code
-- `notebooks/`: Exploratory analysis
-- `tests/`: Automated tests
-- `reports/`: Forecast comparisons, statistical tests, and experiment results
-- `scripts/`: Reproducible analysis and experiment utilities
-- `dashboard/`: Streamlit research dashboard
+---
 
-## Rebuilding the Data Pipeline
+## 📂 Repository Architecture
 
-From the repository root, activate the project virtual environment and run:
+```text
+📦 VolatilityForge
+ ┣ 📂 configs/      # YAML configuration & walk-forward evaluation settings
+ ┣ 📂 data/         # Raw (SPY, VIX) and processed Parquet feature stores
+ ┣ 📂 src/          # Core data pipeline, forecasting models, backtester & metrics
+ ┣ 📂 notebooks/    # Exploratory data analysis & prototyping
+ ┣ 📂 tests/        # Automated unit & offline-mocked integration tests
+ ┣ 📂 reports/      # CSV performance outputs, DM tests & sensitivity matrices
+ ┣ 📂 scripts/      # Reproducible experiment utilities
+ ┗ 📂 dashboard/    # Interactive Streamlit research application
+```
+
+---
+
+## ⚙️ Rebuilding the Data Pipeline
+
+From the repository root, activate your virtual environment and run:
 
 ```powershell
 python -m src.run_data_pipeline
 ```
 
-The pipeline reads `configs/config.yaml`, downloads the configured SPY and VIX daily data, validates and saves the raw datasets, aligns both assets on shared dates, and rebuilds the volatility features and forward targets.
+### 🔄 What This Pipeline Does:
+1. Reads configuration settings from `configs/config.yaml`.
+2. Downloads daily historical data for **SPY** and **VIX** *(requires active network connection; unit tests mock this step offline)*.
+3. Validates schemas, aligns both assets on shared trading dates, and computes leakage-free realized volatility features and forward targets.
+4. Prints row counts and exact date spans for every generated artifact.
 
-Generated files:
+### 💾 Generated Parquet Artifacts:
+* `data/raw/spy.parquet` & `data/raw/vix.parquet`
+* `data/processed/spy_vix.parquet`
+* `data/processed/volatility_features.parquet`
 
-- `data/raw/spy.parquet`
-- `data/raw/vix.parquet`
-- `data/processed/spy_vix.parquet`
-- `data/processed/volatility_features.parquet`
+> ⚠️ **Reproducibility Note:** Rebuilding the pipeline queries the data provider's live API response. Bit-for-bit historical reproducibility is not guaranteed if the upstream provider retroactively revises historical records.
 
-The command prints row counts and date ranges for each output. It requires network access for the market-data download. Its integration test mocks downloads and runs without network access.
+---
 
-The pipeline rebuilds the raw Parquet files from the data provider's current response; it does not guarantee bit-for-bit historical reproducibility if the provider revises its data.
+## 🧪 Experimental Research: 5-Day HAR-RV Smearing Correction
 
-## Project Status
+A standalone experimental study evaluates **Duan's smearing correction** on $5\text{-day}$ `HAR-RV` log-scale forecasts using historical out-of-sample (OOS) log residuals. 
 
-### Implemented
+To prevent lookahead bias, the multiplicative smearing factor is estimated strictly from historical residuals whose $5\text{-day}$ targets have **fully matured** prior to the forecast origin.
 
-- Historical market-data loading using SPY and VIX data
-- SPY/VIX date alignment
-- Leakage-aware volatility feature and target construction
-- EWMA, GARCH, GJR-GARCH, HAR-RV, and LightGBM forecasting implementations
-- One-day and five-day forecast comparisons
-- QLIKE and MSE evaluation
-- Diebold–Mariano forecast comparisons and HAC-lag sensitivity analysis
-- Volatility-regime analysis
-- Volatility-targeting strategy backtests with transaction costs
-- Strategy performance reports with gross/net returns and a same-period gross buy-and-hold benchmark
-- Strategy sensitivity analysis across 8%, 10%, and 12% annual volatility targets and 0, 5, 10, and 20 bps transaction costs
-- Automated tests for key forecasting and evaluation components
+### 📊 Development-Period Results (`2022-01-03` to `2026-10-08`)
 
-### Experimental Research
+| Metric | Baseline HAR-RV | OOS-Smearing HAR-RV | Relative Change |
+| :--- | :---: | :---: | :---: |
+| **Mean QLIKE** | `0.457635` | `0.372767` | **-18.54%** 🟢 |
+| **MSE** | `1.017897 × 10⁻⁶` | `9.917346 × 10⁻⁷` | **-2.57%** 🟢 |
+| **Valid Observations** | `1,196` | `1,196` | — |
 
-A separate five-day HAR-RV experiment evaluates Duan's smearing correction using historical out-of-sample log residuals.
+### 🔍 Key Takeaways & Caveats
+* **Regime Asymmetry:** While aggregate QLIKE improved by **~18.54%**, performance gains were concentrated in elevated volatility regimes. In low-realized-variance regimes, performance deteriorated, and QLIKE improved on only **496 of 1,196** individual dates (`41.5%`).
+* **Production Status:** These findings remain exploratory. The smearing correction has **not** been merged into the production `HAR-RV` model, and results do not imply statistical significance.
 
-The correction estimates a multiplicative factor from residuals whose five-day targets have fully matured before the forecast origin. The experiment is implemented separately from the production HAR-RV forecasting code.
+---
 
-Development-period results:
+## 💹 Strategy Economic Evaluation & Backtesting
 
-| Metric | Baseline HAR-RV | OOS-smearing HAR-RV |
-|---|---:|---:|
-| Mean QLIKE | 0.457635 | 0.372767 |
-| MSE | 1.017897 × 10⁻⁶ | 9.917346 × 10⁻⁷ |
-| Observations | 1,196 | 1,196 |
+Forecasts generated after market close on date $t$ determine target portfolio exposure for session $t+1$:
+* **Constraints:** Long-only exposure capped at configured maximum leverage (`1.0x` baseline).
+* **Frictions:** Transaction costs are deducted proportionally to absolute daily changes in portfolio weight (turnover).
+* **Metrics Tracked:** Gross/Net returns, annualized return & volatility, Sharpe ratio ($R_f = 0$), max drawdown, exposure, turnover, and a $1\text{x}$ **gross** buy-and-hold SPY benchmark.
 
-Evaluation period: January 3, 2022, through October 8, 2026.
+### 🛠️ Reproducing Strategy Reports
 
-The correction improved aggregate QLIKE by approximately 18.54% and MSE by approximately 2.57% in this development sample.
-
-However, the improvement was uneven across years and realized-variance regimes. Low-realized-variance regime performance deteriorated, and QLIKE improved on 496 of 1,196 individual dates.
-
-These results are exploratory. The smearing correction has **not** been adopted in the production HAR-RV model. The results do not establish statistical significance or future performance.
-
-### Strategy Economic Evaluation
-
-The strategy backtests apply each forecast made after close on date *t* to the next session's return. Exposure is long-only and capped by the configured maximum leverage. Transaction costs are charged on absolute changes in exposure.
-
-Reports include gross and net returns, annualized return and volatility, zero-risk-free-rate Sharpe ratio, maximum drawdown, exposure, turnover, and a same-period 1x gross buy-and-hold benchmark.
-
-Generated reports:
-
-- `reports/strategy_performance.csv`
-- `reports/strategy_sensitivity.csv`
-
-The sensitivity report evaluates five forecasting models at annualized volatility targets of 8%, 10%, and 12%, with transaction costs of 0, 5, 10, and 20 basis points. It reports net performance and turnover-related costs. The configured baseline is a 10% volatility target, 1.0 maximum leverage, and 5 basis points per unit of turnover.
-
-#### Reproducing the Strategy Reports
-
-Run the following commands from the repository root with the virtual environment activated:
+Ensure processed feature data and model forecasts already exist, then execute:
 
 ```powershell
+# 1. Run volatility-targeting backtests using saved forecasts
 python -m src.run_strategy_backtest
+
+# 2. Generate core strategy performance table -> reports/strategy_performance.csv
 python -m src.run_strategy_report
+
+# 3. Run multi-parameter grid sensitivity -> reports/strategy_sensitivity.csv
 python -m src.run_strategy_sensitivity
 ```
 
-The commands perform the following tasks:
+### 🎛️ Sensitivity Grid Parameters
+The sensitivity runner tests **5 forecasting models** across:
+* **Annualized Volatility Targets:** `8%`, `10%` *(baseline)*, and `12%`
+* **Transaction Cost Assumptions:** `0 bps`, `5 bps` *(baseline)*, `10 bps`, and `20 bps` per unit of turnover
 
-1. `src.run_strategy_backtest` runs the configured volatility-targeting backtests using the saved forecasts and processed feature data.
-2. `src.run_strategy_report` generates `reports/strategy_performance.csv`.
-3. `src.run_strategy_sensitivity` evaluates the five forecasting models across the three target-volatility levels and four transaction-cost assumptions, then writes `reports/strategy_sensitivity.csv`.
+> 📌 **Evaluation Guardrails:** The `2022+` sample has been actively used for model comparisons and strategy analysis—it is **development data**, not an untouched holdout. Furthermore, the $1\text{x}$ buy-and-hold benchmark is reported **gross** of fees, whereas strategy net returns deduct transaction costs.
 
-The processed feature data and forecast files must already exist. These commands do not independently rebuild the data pipeline or retrain forecasting models. The sensitivity runner reuses the project's strategy backtest and metrics implementations.
+---
 
-These results use the development period beginning in 2022. This period has already been used for model comparison and strategy analysis; it is not an untouched final holdout. Sensitivity analysis does not establish statistical robustness, live executability, or future profitability.
+## 🖥️ Running the Interactive Dashboard
 
-The buy-and-hold benchmark is gross, while strategy net returns deduct the configured costs, so those comparisons are not cost-matched. Market-data providers may revise historical observations, and a future prospective evaluation period must be defined only after the protocol and model specifications are frozen.
-
-### Next Priorities
-
-1. Freeze model specifications, feature definitions, hyperparameters, and the evaluation protocol.
-2. Define a prospective evaluation period after the protocol is frozen.
-3. Preserve the prospective period for final evaluation rather than model selection or tuning.
-4. Improve experiment reproducibility, diagnostics, and reporting.
-5. Complete the source-to-guide scope audit and release documentation.
-
-## Running the Dashboard
-
-From the repository root with the virtual environment activated:
+Launch the **Streamlit** research interface from the repository root:
 
 ```powershell
 python -m streamlit run dashboard/app.py
 ```
 
-The dashboard provides overview, model comparison, volatility regime, and strategy backtest views.
+**Included Views:**
+1. 📈 **Executive Overview:** Dataset coverage and summary statistics.
+2. 🏆 **Model Comparison:** Horizon-specific QLIKE/MSE tables and Diebold–Mariano matrices.
+3. 🌊 **Volatility Regimes:** Conditional performance across calm and stressed market environments.
+4. 💰 **Strategy Backtests:** Equity curves, drawdown profiles, and cost sensitivity.
 
-## Reproducibility and Evaluation Protocol
+---
 
-Experiments use chronological expanding-window walk-forward evaluation. Training labels must be available before each forecast origin, and multi-day targets must be fully matured before they are eligible for training or residual estimation.
+## 🔒 Reproducibility, Timeline & Next Priorities
 
-The period beginning in 2022 has already been used for model selection, model comparisons, corrections, regime analysis, and strategy backtests. It is therefore classified as development data, not an untouched final holdout.
+### 📅 Data Horizon Snapshot
+* **Latest Processed Market Data:** `October 15, 2026`
+* **Latest Matured 5-Day Target:** `October 8, 2026` *(the final 5 forecast origins do not yet have fully realized 5-day forward outcomes).*
 
-The latest processed market-data date is October 15, 2026. The latest valid five-day target in the current smearing experiment is October 8, 2026; the final five forecast origins do not yet have fully matured five-day outcomes.
+### 🚀 Next Priorities
+1. **Freeze Specifications:** Lock model architectures, feature sets, hyperparameters, and evaluation rules.
+2. **Define Prospective Holdout:** Establish a dedicated post-freeze prospective evaluation window.
+3. **Protect Holdout Integrity:** Restrict the prospective window strictly to final reporting (zero tuning or model selection).
+4. **Enhance Diagnostics:** Expand automated test coverage, pipeline logging, and release documentation.
 
-A prospective evaluation period must be defined after model specifications, feature definitions, hyperparameters, and evaluation procedures are frozen. Results from that period must not be used for model selection or tuning.
+---
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-This project is for educational and research purposes only. Historical backtest and forecast-comparison results do not guarantee future performance and are not financial advice.
+*This repository is strictly for **educational and quantitative research purposes**. Historical backtests, regime analyses, and out-of-sample forecast comparisons do not guarantee future market performance and do not constitute financial or investment advice.*
