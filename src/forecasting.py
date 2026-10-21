@@ -80,7 +80,7 @@ def generate_ewma_forecasts(
         if date >= test_start_date:
             forecasts.loc[date] = variance
 
-            result = pd.DataFrame(index=forecasts.index)
+    result = pd.DataFrame(index=forecasts.index)
     result["ewma_variance_1d"] = forecasts
 
     # Approximate five-session cumulative variance by assuming

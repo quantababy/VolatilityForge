@@ -9,8 +9,8 @@ from src import compare_five_day_forecasts, compare_forecasts
 @pytest.mark.parametrize(
     ("module", "expected_models", "expected_lag"),
     [
-        (compare_forecasts, 5, 5),
-        (compare_five_day_forecasts, 4, 4),
+        (compare_forecasts, 6, 5),
+        (compare_five_day_forecasts, 6, 4),
     ],
 )
 def test_calibration_report_contains_each_model(

@@ -1,0 +1,7 @@
+model,mean_qlike,mcs_p_value,in_confidence_set,forecast_horizon,alpha,bootstrap_reps,block_size,bootstrap_method,mcs_test_statistic,n_observations,start_date,end_date
+LightGBM,1.4391959434,1,True,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16
+VIX-implied,1.52044250138,0.011,False,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16
+HAR-RV,1.52742646078,0.011,False,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16
+EWMA,1.53275749386,0.011,False,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16
+"GARCH(1,1)",1.6642546003,0.011,False,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16
+"GJR-GARCH(1,1)",1.66569161076,0.011,False,1,0.1,1000,5,circular block bootstrap,R,1200,2022-01-03,2026-10-16

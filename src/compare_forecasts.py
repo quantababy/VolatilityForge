@@ -25,6 +25,10 @@ FORECAST_FILES = {
         "data/processed/lightgbm_forecasts.parquet",
         "lightgbm_variance_1d",
     ),
+    "VIX-implied": (
+        "data/processed/vix_implied_forecasts.parquet",
+        "vix_implied_variance_1d",
+    ),
 }
 
 

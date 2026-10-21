@@ -1,4 +1,5 @@
-﻿import numpy as np
+﻿
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -8,13 +9,19 @@ from src.feature_engineering import build_volatility_features
 def make_data(n=35):
     dates = pd.bdate_range("2024-01-01", periods=n)
     close = 100 * np.exp(np.arange(n) * 0.01)
-    return pd.DataFrame(
+    open_price = np.concatenate(([close[0]], close[:-1]))
+
+    data = pd.DataFrame(
         {
+            "Open": open_price,
+            "High": np.maximum(open_price, close) * 1.01,
+            "Low": np.minimum(open_price, close) * 0.99,
             "Close": close,
             "VIX_Close": np.full(n, 20.0),
         },
         index=dates,
     )
+    return data
 
 
 def test_builds_log_returns_and_squared_returns():
@@ -35,28 +42,42 @@ def test_builds_log_returns_and_squared_returns():
     )
 
 
-def test_historical_variance_uses_only_past_and_current_returns():
-    data = make_data()
-    result = build_volatility_features(data)
+def test_builds_ohlc_features():
+    result = build_volatility_features(make_data())
 
-    expected_squared_returns = result["squared_return"]
+    expected_columns = [
+        "overnight_gap",
+        "parkinson_variance",
+        "garman_klass_variance",
+        "rogers_satchell_variance",
+    ]
+
+    for column in expected_columns:
+        assert column in result.columns
+        assert result[column].notna().any()
+
+    assert result["overnight_gap"].iloc[0] != result["overnight_gap"].iloc[0]
+
+
+def test_historical_variance_uses_only_past_and_current_returns():
+    result = build_volatility_features(make_data())
+    squared_returns = result["squared_return"]
 
     assert result["rv_5"].iloc[:5].isna().all()
     assert result["rv_22"].iloc[:22].isna().all()
 
     np.testing.assert_allclose(
         result["rv_5"].iloc[5],
-        expected_squared_returns.iloc[1:6].sum(),
+        squared_returns.iloc[1:6].sum(),
     )
     np.testing.assert_allclose(
         result["rv_22"].iloc[22],
-        expected_squared_returns.iloc[1:23].sum(),
+        squared_returns.iloc[1:23].sum(),
     )
 
 
 def test_forward_targets_use_future_returns():
-    data = make_data()
-    result = build_volatility_features(data)
+    result = build_volatility_features(make_data())
     squared_returns = result["squared_return"]
 
     np.testing.assert_allclose(
@@ -87,16 +108,13 @@ def test_rejects_nonpositive_prices():
     data = make_data()
     data.loc[data.index[5], "Close"] = 0
 
-    with pytest.raises(ValueError, match="closing prices must be positive"):
+    with pytest.raises(ValueError, match="positive"):
         build_volatility_features(data)
 
 
 def test_rejects_duplicate_dates():
     data = make_data()
-    data.index = pd.DatetimeIndex(
-        ["2024-01-02"] * len(data)
-    )
+    data.index = pd.DatetimeIndex(["2024-01-02"] * len(data))
 
     with pytest.raises(ValueError, match="duplicate dates"):
         build_volatility_features(data)
-

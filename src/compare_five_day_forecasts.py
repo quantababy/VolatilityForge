@@ -31,6 +31,14 @@ FORECAST_FILES = {
         "data/processed/har_rv_five_day_forecasts.parquet",
         "har_rv_variance_5d",
     ),
+    "LightGBM": (
+        "data/processed/lightgbm_five_day_forecasts.parquet",
+        "lightgbm_variance_5d",
+    ),
+    "VIX-implied": (
+        "data/processed/vix_implied_five_day_forecasts.parquet",
+        "vix_implied_variance_5d",
+    ),
 }
 
 

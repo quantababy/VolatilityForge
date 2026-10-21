@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -122,6 +121,7 @@ def test_future_predictor_changes_do_not_change_earlier_forecasts() -> None:
         changed_forecasts.iloc[:cutoff],
     )
 
+
 def test_rejects_missing_columns() -> None:
     features = make_features().drop(columns=["VIX_Close"])
 
@@ -178,6 +178,7 @@ def test_zero_targets_are_supported() -> None:
     )
 
     assert (forecasts.dropna() > 0).all()
+
 
 def test_prospective_forecast_does_not_require_future_target() -> None:
     from src.models.lightgbm_model import (
@@ -252,3 +253,63 @@ def test_prospective_forecast_uses_only_matured_training_labels(
         check_names=False,
     )
     assert features.index[-1] not in captured["X"].index
+
+
+def test_five_day_forecasts_use_only_matured_training_labels(
+    monkeypatch,
+) -> None:
+    import src.models.lightgbm_model as lightgbm_module
+
+    features = make_features(180)
+    features["target_rv_5"] = (
+        features["squared_return"].rolling(5, min_periods=5).sum().shift(-5)
+    )
+
+    captured = {}
+
+    class FakeModel:
+        def __init__(self, **kwargs):
+            pass
+
+        def fit(self, X, y):
+            captured["X"] = X.copy()
+            captured["y"] = y.copy()
+            return self
+
+        def predict(self, X):
+            # Capture the origin of the forecast being generated.
+            captured["forecast_origin"] = X.index[0]
+            return np.array([1e-4])
+
+    monkeypatch.setattr(
+        lightgbm_module,
+        "LGBMRegressor",
+        FakeModel,
+    )
+
+    forecasts = lightgbm_module.lightgbm_five_day_variance_forecasts(
+        features,
+        minimum_training_observations=30,
+        reestimate_every=1,
+    )
+
+    available = forecasts.dropna()
+    assert not available.empty
+    assert np.isfinite(available).all()
+    assert (available > 0).all()
+
+    # A five-day label at position s matures only after its five
+    # subsequent daily returns are observable. The required rule is
+    # s + 5 < forecast position, equivalent to s <= position - 6.
+    forecast_position = features.index.get_loc(captured["forecast_origin"])
+    training_positions = features.index.get_indexer(captured["X"].index)
+
+    assert len(training_positions) > 0
+    assert (training_positions <= forecast_position - 6).all()
+
+    # Ensure the captured targets correspond to the exact training rows.
+    pd.testing.assert_series_equal(
+        captured["y"],
+        features["target_rv_5"].loc[captured["X"].index],
+        check_names=False,
+    )
